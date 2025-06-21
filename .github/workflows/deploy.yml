@@ -31,7 +31,6 @@ jobs:
 
       - name: Install dependencies and Build Yard Sale Tracker App
         run: |
-          cd yard-sale-tracker/
           npm install
           npm run build
           # Copy the built app content from yard-sale-tracker/dist to deploy_build/yard-sale-tracker/
