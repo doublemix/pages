@@ -116,6 +116,8 @@
     <div id="root"></div>
 
     <script type="text/babel">
+        const { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } = React;
+
         // Helper to format milliseconds into HH:MM:SS string.
         const formatTime = (ms) => {
             if (ms < 0) ms = 0;
@@ -139,19 +141,16 @@
             return (hours * 3600 + minutes * 60 + seconds) * 1000;
         };
 
-        // Global variable to store scroll data for preservation between re-renders
         let scrollPosition = { scrollTop: 0, scrollHeight: 0, clientHeight: 0, wasAtBottom: true, eventsLength: 0 };
         let nextEventId = 0;
 
-        const EventButtons = React.memo(({ events, setEvents, startTime, isRunning }) => {
+        const EventButtons = React.memo(({ setEvents, startTime, isRunning }) => {
             const buttonConfig = [
-                // One-Off Events (Primary/Indigo)
                 { name: "First Contact", type: "one_off", color: "bg-indigo-600 hover:bg-indigo-700" },
                 { name: "Seated", type: "one_off", color: "bg-indigo-600 hover:bg-indigo-700" },
                 { name: "Server Approached", type: "one_off", color: "bg-indigo-600 hover:bg-indigo-700" },
                 { name: "Bill Received", type: "one_off", color: "bg-indigo-600 hover:bg-indigo-700" },
 
-                // Timed Event Starts (Neutral/Gray)
                 { name: "Drinks Ordered", type: "start", color: "bg-gray-600 hover:bg-gray-700" },
                 { name: "Appetizers Ordered", type: "start", color: "bg-gray-600 hover:bg-gray-700" },
                 { name: "Main Meal Ordered", type: "start", color: "bg-gray-600 hover:bg-gray-700" },
@@ -159,8 +158,8 @@
                 { name: "Waiting for Bill", type: "start", color: "bg-gray-600 hover:bg-gray-700" },
             ];
 
-            const logEvent = React.useCallback((name, type, customTimestamp) => {
-                if (!isRunning && type !== 'start_visit') return;
+            const logEvent = useCallback((name, type, customTimestamp) => {
+                if (!isRunning) return; // Only allow logging if timer is running
 
                 const timestamp = customTimestamp || Date.now();
                 const relativeTimeMs = timestamp - startTime;
@@ -183,7 +182,7 @@
                 logEvent(name, type);
             };
 
-            const [customInput, setCustomInput] = React.useState('');
+            const [customInput, setCustomInput] = useState('');
 
             const logCustomEvent = (type) => {
                 if (customInput.trim() && isRunning) {
@@ -265,28 +264,23 @@
         });
 
         const EventLog = React.memo(({ events, setEvents, startTime, openEditModal, endTimedEvent }) => {
-            const logRef = React.useRef(null);
+            const logRef = useRef(null);
 
-            // useLayoutEffect runs after the DOM is updated but before the browser paints.
-            // This is crucial for preserving scroll position on frequent updates (like the 1s timer).
-            React.useLayoutEffect(() => {
+            // Logic to preserve scroll position on timer updates
+            useLayoutEffect(() => {
                 const logElement = logRef.current;
                 if (!logElement) return;
 
                 const { scrollHeight, clientHeight } = logElement;
 
-                // Check if new content was added (structural change)
                 const isNewEvent = scrollPosition.eventsLength < events.length;
 
                 if (isNewEvent || scrollPosition.wasAtBottom) {
-                    // Scroll to bottom if a new event was logged OR if the user was already following the scroll
                     logElement.scrollTop = logElement.scrollHeight;
                 } else {
-                    // Restore position for pure time updates (running duration changes)
                     logElement.scrollTop = scrollPosition.scrollTop;
                 }
 
-                // Update the global scroll position for the next render cycle
                 scrollPosition = {
                     scrollTop: logElement.scrollTop,
                     scrollHeight: scrollHeight,
@@ -304,21 +298,19 @@
                     let newEvents = prevEvents.filter(e => e.id !== id);
 
                     if (eventToDelete.type === 'start') {
-                        // If deleting a 'start' event, remove its paired 'end' event too
                         newEvents = newEvents.filter(e => e.pairedId !== id || e.type !== 'end');
                     } else if (eventToDelete.type === 'end' && eventToDelete.pairedId) {
-                        // If deleting an 'end' event, reactivate its paired 'start' event
                         const pairedStartEvent = newEvents.find(e => e.id === eventToDelete.pairedId && e.type === 'start');
                         if (pairedStartEvent) {
-                            pairedStartEvent.isActive = true;
+                            // Find and update the start event to be active again
+                            return newEvents.map(e => e.id === pairedStartEvent.id ? { ...e, isActive: true } : e);
                         }
                     }
                     return newEvents;
                 });
             };
 
-            const displayEvents = React.useMemo(() => {
-                // Filter out the non-displayable 'start_visit' event type (though it was already removed from the logEvent)
+            const displayEvents = useMemo(() => {
                 let filteredEvents = events.filter(e => e.type !== 'start_visit');
 
                 const visitFinishedEvent = filteredEvents.find(e => e.type === 'end_visit');
@@ -394,10 +386,10 @@
         });
 
         const EditModal = ({ isOpen, closeModal, event, saveChanges, startTime }) => {
-            const [name, setName] = React.useState('');
-            const [timeStr, setTimeStr] = React.useState('');
+            const [name, setName] = useState('');
+            const [timeStr, setTimeStr] = useState('');
 
-            React.useEffect(() => {
+            useEffect(() => {
                 if (isOpen && event) {
                     setName(event.name);
                     setTimeStr(event.relativeTime);
@@ -407,7 +399,7 @@
             const handleSave = () => {
                 const newRelativeTimeMs = parseTime(timeStr);
                 if (!name.trim() || isNaN(newRelativeTimeMs)) {
-                    console.error("Invalid input for save.");
+                    console.error("Invalid input for save. Name cannot be empty and time must be HH:MM:SS.");
                     return;
                 }
                 saveChanges(event.id, name, newRelativeTimeMs);
@@ -446,31 +438,39 @@
         };
 
         const App = () => {
-            const [startTime, setStartTime] = React.useState(0);
-            const [timerIntervalId, setTimerIntervalId] = React.useState(null);
-            const [events, setEvents] = React.useState([]);
+            const [startTime, setStartTime] = useState(0);
+            const [events, setEvents] = useState([]);
 
             // Modal State
-            const [isModalOpen, setIsModalOpen] = React.useState(false);
-            const [editingEvent, setEditingEvent] = React.useState(null);
+            const [isModalOpen, setIsModalOpen] = useState(false);
+            const [editingEvent, setEditingEvent] = useState(null);
 
-            const isRunning = timerIntervalId !== null;
+            // Derived state: Timer is running if startTime is set
+            const isRunning = startTime > 0;
 
-            // Main timer effect: runs every second to force a re-render and update active durations
-            React.useEffect(() => {
-                if (startTime > 0 && isRunning) {
-                    const id = setInterval(() => {
+            // --- Timer Management Effect (FIXED) ---
+            useEffect(() => {
+                let intervalId = null;
+                
+                // If startTime is greater than 0, create and start the interval
+                if (startTime > 0) {
+                    intervalId = setInterval(() => {
                         // Force update the events state to trigger a re-render, updating running times
                         setEvents(prevEvents => [...prevEvents]);
                     }, 1000);
-                    setTimerIntervalId(id);
                 }
+
+                // Cleanup function: clears the interval when startTime changes to 0 or component unmounts
                 return () => {
-                    if (timerIntervalId) {
-                        clearInterval(timerIntervalId);
+                    if (intervalId) {
+                        clearInterval(intervalId);
                     }
                 };
-            }, [startTime]); // Run only on initial mount and when startTime changes
+            }, [startTime]); 
+            // The effect now only depends on startTime. When startTime changes to a positive number,
+            // it starts the interval. When it changes back to 0 (reset/finish), the cleanup runs.
+            // --- End Timer Management Effect ---
+
 
             // --- Handlers ---
 
@@ -478,35 +478,28 @@
                 if (isRunning) return;
                 const now = Date.now();
                 setStartTime(now);
-                // The main useEffect handles setting the intervalID on startTime change.
+                // The useEffect above will now correctly start the interval.
             };
 
             const handleReset = () => {
-                if (timerIntervalId) {
-                    clearInterval(timerIntervalId);
-                }
-                setTimerIntervalId(null);
+                // Setting startTime to 0 triggers the cleanup in useEffect
                 setStartTime(0);
                 setEvents([]);
-                nextEventId = 0; // Reset ID counter
-                // Reset scroll position reference
+                nextEventId = 0;
                 scrollPosition = { scrollTop: 0, scrollHeight: 0, clientHeight: 0, wasAtBottom: true, eventsLength: 0 };
             };
 
             const handleFinish = () => {
                 if (!isRunning) return;
 
-                if (timerIntervalId) {
-                    clearInterval(timerIntervalId);
-                }
-                setTimerIntervalId(null);
+                // Setting startTime to 0 triggers the cleanup in useEffect
+                setStartTime(0);
 
                 const finishTime = Date.now();
 
-                // End any remaining active timed events
-                let finalEvents = [];
+                // End any remaining active timed events and log the finish event
                 setEvents(prevEvents => {
-                    finalEvents = [...prevEvents];
+                    let finalEvents = [...prevEvents];
                     const activeStarts = finalEvents.filter(e => e.type === 'start' && e.isActive);
 
                     activeStarts.forEach(startEvent => {
@@ -523,7 +516,11 @@
                             duration: finishTime - startEvent.timestamp,
                             isActive: false,
                         });
-                        startEvent.isActive = false; // Mark original as inactive
+                        // Mark original start event as inactive (using a new array for mapping)
+                        const startEventIndex = finalEvents.findIndex(e => e.id === startEvent.id);
+                        if(startEventIndex !== -1) {
+                            finalEvents[startEventIndex] = { ...finalEvents[startEventIndex], isActive: false };
+                        }
                     });
 
                     // Log the visit finished event
@@ -542,7 +539,7 @@
                 });
             };
 
-            const endTimedEvent = React.useCallback((startEventId) => {
+            const endTimedEvent = useCallback((startEventId) => {
                 const finishTime = Date.now();
 
                 setEvents(prevEvents => {
@@ -563,7 +560,7 @@
                         isActive: false,
                     };
 
-                    // Update the start event to be inactive (must be done on a copy of the event)
+                    // Update the start event to be inactive and return the complete new state
                     const updatedEvents = prevEvents.map(e =>
                         e.id === startEventId ? { ...e, isActive: false } : e
                     );
@@ -591,25 +588,33 @@
                         timestamp: newTimestamp,
                     };
 
-                    // Recalculate durations for affected paired events
-                    if (updatedEvent.type === 'start') {
-                        // Find paired end event and update its duration
-                        const pairedEndIndex = prevEvents.findIndex(e => e.pairedId === id && e.type === 'end');
-                        if (pairedEndIndex !== -1) {
-                            const pairedEndEvent = prevEvents[pairedEndIndex];
-                            pairedEndEvent.duration = pairedEndEvent.timestamp - newTimestamp;
-                        }
-                    } else if (updatedEvent.type === 'end' && updatedEvent.pairedId) {
-                        // Update the current event's duration based on the (unchanged) start event
-                        const pairedStartEvent = prevEvents.find(e => e.id === updatedEvent.pairedId && e.type === 'start');
-                        if (pairedStartEvent) {
-                            updatedEvent.duration = newTimestamp - pairedStartEvent.timestamp;
-                        }
-                    }
+                    // Note: Since this is map, we need to manually update related items later,
+                    // but since the display depends on *all* events, the next re-render
+                    // will recalculate durations correctly based on these new timestamps.
+                    // For immediate accuracy within the map, we only update the current event.
 
                     return updatedEvent;
+                }).map(event => {
+                    // This second map ensures paired durations are updated in the same state change
+                    if (event.type === 'end' && event.pairedId) {
+                        const pairedStartEvent = prevEvents.find(e => e.id === event.pairedId && e.type === 'start');
+                        const updatedStartEvent = prevEvents.find(e => e.id === event.pairedId); // Find the potentially updated start event
+                        
+                        // Recalculate duration if this 'end' event is paired to the one just updated, or if it was the one updated.
+                        if (event.id === id || event.pairedId === id) {
+                            const start = prevEvents.find(e => e.id === event.pairedId);
+                            if (start) {
+                                return {
+                                    ...event,
+                                    duration: event.timestamp - start.timestamp
+                                };
+                            }
+                        }
+                    }
+                    return event;
                 }));
             };
+
 
             // Calculate current timer value
             const elapsedTime = startTime === 0 ? 0 : Date.now() - startTime;
@@ -626,7 +631,7 @@
                             id="startButton"
                             className="action-button bg-green-500 hover:bg-green-600 text-white flex-1"
                             onClick={handleStart}
-                            disabled={isRunning || startTime > 0}
+                            disabled={isRunning}
                         >
                             Start Visit
                         </button>
@@ -648,7 +653,7 @@
                         </button>
                     </div>
 
-                    <EventButtons events={events} setEvents={setEvents} startTime={startTime} isRunning={isRunning} />
+                    <EventButtons setEvents={setEvents} startTime={startTime} isRunning={isRunning} />
 
                     <EventLog
                         events={events}
