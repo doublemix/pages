@@ -27,7 +27,7 @@ jobs:
       - name: Prepare deployment directory
         run: |
           mkdir -p deploy_build/yard-sale-tracker # Create parent and subfolder for yard-sale-tracker
-          cp index.html deploy_build/ # Copy the root index.html to the deploy_build root
+          cp *.html deploy_build/ # Copy the root index.html to the deploy_build root
 
       - name: Install dependencies and Build Yard Sale Tracker App
         run: |
