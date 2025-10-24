@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restaurant Speed Run Clock</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- React and Babel CDNs -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            padding: 1rem;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            padding: 1.5rem;
+            max-width: 700px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            margin-top: 1rem;
+        }
+        .timer-display {
+            font-size: 3.5rem;
+            font-weight: 700;
+            color: #1f2937;
+            text-align: center;
+            padding: 1rem 0;
+            background-color: #e5e7eb;
+            border-radius: 1rem;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.06);
+        }
+        .action-button {
+            padding: 1rem 0.75rem;
+            border-radius: 0.75rem;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            line-height: 1.2;
+            cursor: pointer;
+        }
+        .action-button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        }
+        .action-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        .btn-end-active {
+            background-color: #3b82f6;
+            color: white;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.8rem;
+            border-radius: 0.5rem;
+            box-shadow: none;
+        }
+        .btn-end-active:hover:not(:disabled) {
+            background-color: #2563eb;
+            transform: none;
+        }
+        .unified-event-list {
+            background-color: #f9fafb;
+            border-radius: 1rem;
+            padding: 1rem;
+            min-height: 150px;
+            max-height: 500px;
+            overflow-y: auto;
+            border: 1px solid #e5e7eb;
+        }
+        .event-item {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.6rem 0;
+            border-bottom: 1px dashed #d1d5db;
+            font-size: 0.95rem;
+        }
+        .event-item .event-name {
+            font-weight: 600;
+        }
+        /* Modal Styles simplified for React */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // Helper to format milliseconds into HH:MM:SS string.
+        const formatTime = (ms) => {
+            if (ms < 0) ms = 0;
+            const totalSeconds = Math.floor(ms / 1000);
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = totalSeconds % 60;
+
+            return [hours, minutes, seconds]
+                .map(unit => unit.toString().padStart(2, '0'))
+                .join(':');
+        };
+
+        // Helper to parse HH:MM:SS string into milliseconds.
+        const parseTime = (timeStr) => {
+            const parts = timeStr.split(':').map(Number);
+            if (parts.length !== 3 || parts.some(isNaN)) {
+                return NaN;
+            }
+            const [hours, minutes, seconds] = parts;
+            return (hours * 3600 + minutes * 60 + seconds) * 1000;
+        };
+
+        // Global variable to store scroll data for preservation between re-renders
+        let scrollPosition = { scrollTop: 0, scrollHeight: 0, clientHeight: 0, wasAtBottom: true, eventsLength: 0 };
+        let nextEventId = 0;
+
+        const EventButtons = React.memo(({ events, setEvents, startTime, isRunning }) => {
+            const buttonConfig = [
+                // One-Off Events (Primary/Indigo)
+                { name: "First Contact", type: "one_off", color: "bg-indigo-600 hover:bg-indigo-700" },
+                { name: "Seated", type: "one_off", color: "bg-indigo-600 hover:bg-indigo-700" },
+                { name: "Server Approached", type: "one_off", color: "bg-indigo-600 hover:bg-indigo-700" },
+                { name: "Bill Received", type: "one_off", color: "bg-indigo-600 hover:bg-indigo-700" },
+
+                // Timed Event Starts (Neutral/Gray)
+                { name: "Drinks Ordered", type: "start", color: "bg-gray-600 hover:bg-gray-700" },
+                { name: "Appetizers Ordered", type: "start", color: "bg-gray-600 hover:bg-gray-700" },
+                { name: "Main Meal Ordered", type: "start", color: "bg-gray-600 hover:bg-gray-700" },
+                { name: "Waiting for Refill", type: "start", color: "bg-gray-600 hover:bg-gray-700" },
+                { name: "Waiting for Bill", type: "start", color: "bg-gray-600 hover:bg-gray-700" },
+            ];
+
+            const logEvent = React.useCallback((name, type, customTimestamp) => {
+                if (!isRunning && type !== 'start_visit') return;
+
+                const timestamp = customTimestamp || Date.now();
+                const relativeTimeMs = timestamp - startTime;
+
+                const newEvent = {
+                    id: `event-${nextEventId++}`,
+                    name,
+                    timestamp,
+                    relativeTime: formatTime(relativeTimeMs),
+                    type,
+                    pairedId: null,
+                    duration: null,
+                    isActive: type === 'start',
+                };
+
+                setEvents(prevEvents => [...prevEvents, newEvent]);
+            }, [isRunning, startTime, setEvents]);
+
+            const handleButtonClick = (name, type) => {
+                logEvent(name, type);
+            };
+
+            const [customInput, setCustomInput] = React.useState('');
+
+            const logCustomEvent = (type) => {
+                if (customInput.trim() && isRunning) {
+                    logEvent(customInput.trim(), type);
+                    setCustomInput('');
+                }
+            };
+
+            const oneOffs = buttonConfig.filter(b => b.type === 'one_off');
+            const timedStarts = buttonConfig.filter(b => b.type === 'start');
+
+            return (
+                <>
+                    {/* One-Off Event Buttons */}
+                    <div className="event-section">
+                        <h2 className="text-gray-800 text-xl font-semibold">One-Off Events</h2>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            {oneOffs.map((btn) => (
+                                <button
+                                    key={btn.name}
+                                    className={`action-button ${btn.color} text-white`}
+                                    onClick={() => handleButtonClick(btn.name, btn.type)}
+                                    disabled={!isRunning}
+                                >
+                                    {btn.name}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Timed Event Start Buttons */}
+                    <div className="event-section">
+                        <h2 className="text-gray-800 text-xl font-semibold">Start Timed Events</h2>
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                            {timedStarts.map((btn) => (
+                                <button
+                                    key={btn.name}
+                                    className={`action-button ${btn.color} text-white`}
+                                    onClick={() => handleButtonClick(btn.name, btn.type)}
+                                    disabled={!isRunning}
+                                >
+                                    {btn.name}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Custom Event Input */}
+                    <div className="event-section">
+                        <h2 className="text-gray-800 text-xl font-semibold">Custom Event</h2>
+                        <div className="flex flex-col sm:flex-row gap-3">
+                            <input
+                                type="text"
+                                id="customEventInput"
+                                className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                placeholder="Enter custom event name..."
+                                value={customInput}
+                                onChange={(e) => setCustomInput(e.target.value)}
+                                disabled={!isRunning}
+                            />
+                            <button
+                                className="action-button bg-indigo-600 hover:bg-indigo-700 text-white sm:w-auto"
+                                onClick={() => logCustomEvent('one_off')}
+                                disabled={!isRunning || !customInput.trim()}
+                            >
+                                Log One-Off
+                            </button>
+                            <button
+                                className="action-button bg-gray-600 hover:bg-gray-700 text-white sm:w-auto"
+                                onClick={() => logCustomEvent('start')}
+                                disabled={!isRunning || !customInput.trim()}
+                            >
+                                Start Timed
+                            </button>
+                        </div>
+                    </div>
+                </>
+            );
+        });
+
+        const EventLog = React.memo(({ events, setEvents, startTime, openEditModal, endTimedEvent }) => {
+            const logRef = React.useRef(null);
+
+            // useLayoutEffect runs after the DOM is updated but before the browser paints.
+            // This is crucial for preserving scroll position on frequent updates (like the 1s timer).
+            React.useLayoutEffect(() => {
+                const logElement = logRef.current;
+                if (!logElement) return;
+
+                const { scrollHeight, clientHeight } = logElement;
+
+                // Check if new content was added (structural change)
+                const isNewEvent = scrollPosition.eventsLength < events.length;
+
+                if (isNewEvent || scrollPosition.wasAtBottom) {
+                    // Scroll to bottom if a new event was logged OR if the user was already following the scroll
+                    logElement.scrollTop = logElement.scrollHeight;
+                } else {
+                    // Restore position for pure time updates (running duration changes)
+                    logElement.scrollTop = scrollPosition.scrollTop;
+                }
+
+                // Update the global scroll position for the next render cycle
+                scrollPosition = {
+                    scrollTop: logElement.scrollTop,
+                    scrollHeight: scrollHeight,
+                    clientHeight: clientHeight,
+                    wasAtBottom: (logElement.scrollTop + clientHeight >= scrollHeight - 1),
+                    eventsLength: events.length
+                };
+            });
+
+            const deleteEvent = (id) => {
+                setEvents(prevEvents => {
+                    const eventToDelete = prevEvents.find(e => e.id === id);
+                    if (!eventToDelete) return prevEvents;
+
+                    let newEvents = prevEvents.filter(e => e.id !== id);
+
+                    if (eventToDelete.type === 'start') {
+                        // If deleting a 'start' event, remove its paired 'end' event too
+                        newEvents = newEvents.filter(e => e.pairedId !== id || e.type !== 'end');
+                    } else if (eventToDelete.type === 'end' && eventToDelete.pairedId) {
+                        // If deleting an 'end' event, reactivate its paired 'start' event
+                        const pairedStartEvent = newEvents.find(e => e.id === eventToDelete.pairedId && e.type === 'start');
+                        if (pairedStartEvent) {
+                            pairedStartEvent.isActive = true;
+                        }
+                    }
+                    return newEvents;
+                });
+            };
+
+            const displayEvents = React.useMemo(() => {
+                // Filter out the non-displayable 'start_visit' event type (though it was already removed from the logEvent)
+                let filteredEvents = events.filter(e => e.type !== 'start_visit');
+
+                const visitFinishedEvent = filteredEvents.find(e => e.type === 'end_visit');
+                const nonFinishedEvents = filteredEvents.filter(e => e.type !== 'end_visit');
+
+                const activeStarts = nonFinishedEvents.filter(e => e.type === 'start' && e.isActive).sort((a, b) => a.timestamp - b.timestamp);
+                const completedEnds = nonFinishedEvents.filter(e => e.type === 'end').sort((a, b) => b.timestamp - a.timestamp);
+                const oneOffs = nonFinishedEvents.filter(e => e.type === 'one_off').sort((a, b) => b.timestamp - a.timestamp);
+
+                let orderedList = [...activeStarts, ...completedEnds, ...oneOffs];
+
+                if (visitFinishedEvent) {
+                    orderedList.push(visitFinishedEvent);
+                }
+                return orderedList;
+            }, [events]);
+
+            const logItem = (event) => {
+                const isFinished = event.type === 'end_visit';
+                const isRunningTimed = event.type === 'start' && event.isActive;
+
+                let timeInfo = event.relativeTime;
+                let actions = null;
+                let timeInfoStyle = "text-gray-600";
+
+                if (isRunningTimed) {
+                    const currentDurationMs = Date.now() - event.timestamp;
+                    timeInfo = `${event.relativeTime} (${formatTime(currentDurationMs)} running)`;
+                    timeInfoStyle = "text-blue-600 font-bold";
+                    actions = (
+                        <button className="btn-end-active" onClick={() => endTimedEvent(event.id)}>End</button>
+                    );
+                } else if (event.type === 'end') {
+                    timeInfo += ` (Duration: ${formatTime(event.duration)})`;
+                    timeInfoStyle = "text-gray-600";
+                }
+
+                if (!isFinished) {
+                    actions = (
+                        <>
+                            {actions}
+                            <button className="text-gray-500 hover:text-indigo-600" onClick={() => openEditModal(event.id)}>Edit</button>
+                            <button className="text-gray-500 hover:text-red-500" onClick={() => deleteEvent(event.id)}>Delete</button>
+                        </>
+                    );
+                }
+
+                return (
+                    <div key={event.id} className="event-item">
+                        <span className="event-name">{event.name}</span>
+                        <div className="flex items-center gap-4 text-sm mt-1 sm:mt-0 flex-1 justify-end">
+                            <span className={timeInfoStyle}>{timeInfo}</span>
+                            <div className="flex gap-2 text-xs">
+                                {actions}
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            return (
+                <div className="event-section">
+                    <h2 className="text-gray-800 text-xl font-semibold">All Events</h2>
+                    <div id="unifiedEventLog" ref={logRef} className="unified-event-list">
+                        {displayEvents.length === 0 ? (
+                            <p className="text-gray-500 text-center py-4">No events logged yet. Start your visit!</p>
+                        ) : (
+                            displayEvents.map(logItem)
+                        )}
+                    </div>
+                </div>
+            );
+        });
+
+        const EditModal = ({ isOpen, closeModal, event, saveChanges, startTime }) => {
+            const [name, setName] = React.useState('');
+            const [timeStr, setTimeStr] = React.useState('');
+
+            React.useEffect(() => {
+                if (isOpen && event) {
+                    setName(event.name);
+                    setTimeStr(event.relativeTime);
+                }
+            }, [isOpen, event]);
+
+            const handleSave = () => {
+                const newRelativeTimeMs = parseTime(timeStr);
+                if (!name.trim() || isNaN(newRelativeTimeMs)) {
+                    console.error("Invalid input for save.");
+                    return;
+                }
+                saveChanges(event.id, name, newRelativeTimeMs);
+                closeModal();
+            };
+
+            if (!isOpen) return null;
+
+            return ReactDOM.createPortal(
+                <div className="modal-overlay">
+                    <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-sm transform transition-all">
+                        <h3 className="text-2xl font-bold mb-6 text-center text-gray-800">Edit Event</h3>
+                        <label className="block mb-2 font-medium text-gray-700">Event Name:</label>
+                        <input
+                            type="text"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            className="w-full p-3 mb-4 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                        />
+                        <label className="block mb-2 font-medium text-gray-700">Time from Start (HH:MM:SS):</label>
+                        <input
+                            type="text"
+                            value={timeStr}
+                            onChange={(e) => setTimeStr(e.target.value)}
+                            className="w-full p-3 mb-6 border border-gray-300 rounded-lg font-mono focus:ring-indigo-500 focus:border-indigo-500"
+                            placeholder="HH:MM:SS"
+                        />
+                        <div className="flex justify-end gap-3">
+                            <button onClick={closeModal} className="px-4 py-2 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-colors">Cancel</button>
+                            <button onClick={handleSave} className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors">Save</button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            );
+        };
+
+        const App = () => {
+            const [startTime, setStartTime] = React.useState(0);
+            const [timerIntervalId, setTimerIntervalId] = React.useState(null);
+            const [events, setEvents] = React.useState([]);
+
+            // Modal State
+            const [isModalOpen, setIsModalOpen] = React.useState(false);
+            const [editingEvent, setEditingEvent] = React.useState(null);
+
+            const isRunning = timerIntervalId !== null;
+
+            // Main timer effect: runs every second to force a re-render and update active durations
+            React.useEffect(() => {
+                if (startTime > 0 && isRunning) {
+                    const id = setInterval(() => {
+                        // Force update the events state to trigger a re-render, updating running times
+                        setEvents(prevEvents => [...prevEvents]);
+                    }, 1000);
+                    setTimerIntervalId(id);
+                }
+                return () => {
+                    if (timerIntervalId) {
+                        clearInterval(timerIntervalId);
+                    }
+                };
+            }, [startTime]); // Run only on initial mount and when startTime changes
+
+            // --- Handlers ---
+
+            const handleStart = () => {
+                if (isRunning) return;
+                const now = Date.now();
+                setStartTime(now);
+                // The main useEffect handles setting the intervalID on startTime change.
+            };
+
+            const handleReset = () => {
+                if (timerIntervalId) {
+                    clearInterval(timerIntervalId);
+                }
+                setTimerIntervalId(null);
+                setStartTime(0);
+                setEvents([]);
+                nextEventId = 0; // Reset ID counter
+                // Reset scroll position reference
+                scrollPosition = { scrollTop: 0, scrollHeight: 0, clientHeight: 0, wasAtBottom: true, eventsLength: 0 };
+            };
+
+            const handleFinish = () => {
+                if (!isRunning) return;
+
+                if (timerIntervalId) {
+                    clearInterval(timerIntervalId);
+                }
+                setTimerIntervalId(null);
+
+                const finishTime = Date.now();
+
+                // End any remaining active timed events
+                let finalEvents = [];
+                setEvents(prevEvents => {
+                    finalEvents = [...prevEvents];
+                    const activeStarts = finalEvents.filter(e => e.type === 'start' && e.isActive);
+
+                    activeStarts.forEach(startEvent => {
+                        const endName = startEvent.name.trim() + ' Ended';
+                        const relativeTimeMs = finishTime - startTime;
+
+                        finalEvents.push({
+                            id: `event-${nextEventId++}`,
+                            name: endName,
+                            timestamp: finishTime,
+                            relativeTime: formatTime(relativeTimeMs),
+                            type: 'end',
+                            pairedId: startEvent.id,
+                            duration: finishTime - startEvent.timestamp,
+                            isActive: false,
+                        });
+                        startEvent.isActive = false; // Mark original as inactive
+                    });
+
+                    // Log the visit finished event
+                    finalEvents.push({
+                        id: `event-${nextEventId++}`,
+                        name: 'Visit Finished',
+                        timestamp: finishTime,
+                        relativeTime: formatTime(finishTime - startTime),
+                        type: 'end_visit',
+                        pairedId: null,
+                        duration: null,
+                        isActive: false,
+                    });
+
+                    return finalEvents;
+                });
+            };
+
+            const endTimedEvent = React.useCallback((startEventId) => {
+                const finishTime = Date.now();
+
+                setEvents(prevEvents => {
+                    const startEvent = prevEvents.find(e => e.id === startEventId && e.type === 'start' && e.isActive);
+                    if (!startEvent) return prevEvents;
+
+                    const endName = startEvent.name.trim() + ' Ended';
+                    const relativeTimeMs = finishTime - startTime;
+
+                    const newEndEvent = {
+                        id: `event-${nextEventId++}`,
+                        name: endName,
+                        timestamp: finishTime,
+                        relativeTime: formatTime(relativeTimeMs),
+                        type: 'end',
+                        pairedId: startEvent.id,
+                        duration: finishTime - startEvent.timestamp,
+                        isActive: false,
+                    };
+
+                    // Update the start event to be inactive (must be done on a copy of the event)
+                    const updatedEvents = prevEvents.map(e =>
+                        e.id === startEventId ? { ...e, isActive: false } : e
+                    );
+
+                    return [...updatedEvents, newEndEvent];
+                });
+            }, [startTime]);
+
+            const openEditModal = (id) => {
+                const eventToEdit = events.find(e => e.id === id);
+                if (!eventToEdit) return;
+                setEditingEvent(eventToEdit);
+                setIsModalOpen(true);
+            };
+
+            const saveEditedEvent = (id, newName, newRelativeTimeMs) => {
+                setEvents(prevEvents => prevEvents.map(event => {
+                    if (event.id !== id) return event;
+
+                    const newTimestamp = startTime + newRelativeTimeMs;
+                    let updatedEvent = {
+                        ...event,
+                        name: newName,
+                        relativeTime: formatTime(newRelativeTimeMs),
+                        timestamp: newTimestamp,
+                    };
+
+                    // Recalculate durations for affected paired events
+                    if (updatedEvent.type === 'start') {
+                        // Find paired end event and update its duration
+                        const pairedEndIndex = prevEvents.findIndex(e => e.pairedId === id && e.type === 'end');
+                        if (pairedEndIndex !== -1) {
+                            const pairedEndEvent = prevEvents[pairedEndIndex];
+                            pairedEndEvent.duration = pairedEndEvent.timestamp - newTimestamp;
+                        }
+                    } else if (updatedEvent.type === 'end' && updatedEvent.pairedId) {
+                        // Update the current event's duration based on the (unchanged) start event
+                        const pairedStartEvent = prevEvents.find(e => e.id === updatedEvent.pairedId && e.type === 'start');
+                        if (pairedStartEvent) {
+                            updatedEvent.duration = newTimestamp - pairedStartEvent.timestamp;
+                        }
+                    }
+
+                    return updatedEvent;
+                }));
+            };
+
+            // Calculate current timer value
+            const elapsedTime = startTime === 0 ? 0 : Date.now() - startTime;
+            const timerValue = formatTime(elapsedTime);
+
+            return (
+                <div className="container">
+                    {/* Main Timer Display */}
+                    <div id="timerDisplay" className="timer-display">{timerValue}</div>
+
+                    {/* Control Buttons */}
+                    <div className="flex justify-center gap-4">
+                        <button
+                            id="startButton"
+                            className="action-button bg-green-500 hover:bg-green-600 text-white flex-1"
+                            onClick={handleStart}
+                            disabled={isRunning || startTime > 0}
+                        >
+                            Start Visit
+                        </button>
+                        <button
+                            id="resetButton"
+                            className="action-button bg-red-500 hover:bg-red-600 text-white flex-1"
+                            onClick={handleReset}
+                            disabled={startTime === 0}
+                        >
+                            Reset
+                        </button>
+                        <button
+                            id="finishButton"
+                            className="action-button bg-yellow-500 hover:bg-yellow-600 text-white flex-1"
+                            onClick={handleFinish}
+                            disabled={startTime === 0 || !isRunning}
+                        >
+                            Finish
+                        </button>
+                    </div>
+
+                    <EventButtons events={events} setEvents={setEvents} startTime={startTime} isRunning={isRunning} />
+
+                    <EventLog
+                        events={events}
+                        setEvents={setEvents}
+                        startTime={startTime}
+                        openEditModal={openEditModal}
+                        endTimedEvent={endTimedEvent}
+                    />
+
+                    <EditModal
+                        isOpen={isModalOpen}
+                        closeModal={() => setIsModalOpen(false)}
+                        event={editingEvent}
+                        saveChanges={saveEditedEvent}
+                        startTime={startTime}
+                    />
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
+
