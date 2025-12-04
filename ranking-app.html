@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Preference Ranker App</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Configure Tailwind to use the Inter font -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', 'sans-serif';
+            background-color: #f7f7f7;
+            min-height: 100vh;
+        }
+        .item-button {
+            /* Ensures button spans the height on mobile */
+            min-height: 10rem; 
+            transition: transform 0.1s ease-in-out, box-shadow 0.1s ease-in-out;
+            border-width: 2px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .item-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+        }
+        .preset-button-group {
+            display: flex;
+            gap: 0.5rem;
+        }
+        .editable-item-input {
+            transition: border-color 0.15s;
+        }
+        /* Custom image size for comparison buttons */
+        .item-image {
+            height: 6rem; /* h-24 */
+            width: 6rem;  /* w-24 */
+            object-fit: contain; /* or cover, depending on preference */
+            margin-bottom: 0.75rem; /* mb-3 */
+            border-radius: 0.5rem; /* rounded-lg */
+            /* background-color: #f3f4f6; */ /* gray-100 placeholder background */
+        }
+    </style>
+</head>
+<body class="font-sans p-4 sm:p-8 flex justify-center">
+
+    <div id="app" class="w-full max-w-4xl bg-white shadow-2xl rounded-xl p-6 sm:p-8 space-y-8">
+
+        <h1 id="main-title" class="text-3xl font-bold text-center text-indigo-700">The Ultimate Ranking Sorter</h1>
+        
+        <!-- Setup Section -->
+        <div id="setup-section" class="space-y-6">
+            
+            <!-- Presets -->
+            <div class="space-y-3">
+                <h2 class="text-xl font-semibold text-gray-800 border-b pb-2">Presets</h2>
+                
+                <!-- Project Sekai Preset -->
+                <div class="preset-button-group">
+                    <button onclick="startPresetRanking(PROJECT_SEKAI_PRESET)" class="flex-grow p-3 text-white bg-green-600 hover:bg-green-700 rounded-lg font-medium transition duration-150 shadow-md">
+                        Project Sekai Characters
+                    </button>
+                    <button onclick="loadPresetForEditing(PROJECT_SEKAI_PRESET)" title="Load items for editing" class="p-3 text-gray-600 bg-white hover:bg-gray-100 border border-gray-300 rounded-lg shadow-md transition duration-150 text-xl flex items-center justify-center">
+                        ⚙️
+                    </button>
+                </div>
+                
+                <!-- Virtual Singers Preset -->
+                <div class="preset-button-group">
+                    <button onclick="startPresetRanking(VIRTUAL_SINGERS_PRESET)" class="flex-grow p-3 text-white bg-purple-600 hover:bg-purple-700 rounded-lg font-medium transition duration-150 shadow-md">
+                        Virtual Singers (Vocaloids)
+                    </button>
+                    <button onclick="loadPresetForEditing(VIRTUAL_SINGERS_PRESET)" title="Load items for editing" class="p-3 text-gray-600 bg-white hover:bg-gray-100 border border-gray-300 rounded-lg shadow-md transition duration-150 text-xl flex items-center justify-center">
+                        ⚙️
+                    </button>
+                </div>
+
+                 <!-- NFL Teams Preset -->
+                <div class="preset-button-group">
+                    <button onclick="startPresetRanking(NFL_TEAMS_PRESET)" class="flex-grow p-3 text-white bg-blue-700 hover:bg-blue-800 rounded-lg font-medium transition duration-150 shadow-md">
+                        NFL Teams (32)
+                    </button>
+                    <button onclick="loadPresetForEditing(NFL_TEAMS_PRESET)" title="Load items for editing" class="p-3 text-gray-600 bg-white hover:bg-gray-100 border border-gray-300 rounded-lg shadow-md transition duration-150 text-xl flex items-center justify-center">
+                        ⚙️
+                    </button>
+                </div>
+            </div>
+
+            <hr class="border-gray-300">
+
+            <!-- Custom Ranking Setup -->
+            <div class="space-y-4">
+                <h2 class="text-xl font-semibold text-gray-800 border-b pb-2">Custom Ranking Setup (Text Only)</h2>
+                
+                <!-- Title -->
+                <div>
+                    <label for="input-title" class="block text-sm font-medium text-gray-700">App/Ranking Title</label>
+                    <input type="text" id="input-title" value="The Ultimate Ranking Sorter"
+                           class="mt-1 w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm">
+                </div>
+
+                <!-- Prompt -->
+                <div>
+                    <label for="input-prompt" class="block text-sm font-medium text-gray-700">Comparison Prompt</label>
+                    <input type="text" id="input-prompt" value="Which is your favorite?"
+                           class="mt-1 w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm">
+                </div>
+
+                <!-- Item List Input -->
+                <div class="space-y-4 pt-2">
+                    <h3 class="text-lg font-semibold text-gray-800">Items to Rank (<span id="item-list-count">0</span> total)</h3>
+                    
+                    <div id="error-message" class="text-red-600 font-medium hidden p-2 border border-red-300 bg-red-50 rounded-lg">
+                        Please enter at least 2 items to start the ranking.
+                    </div>
+                    
+                    <ul id="item-list-container" class="space-y-2 max-h-60 overflow-y-auto p-2 border border-gray-100 rounded-lg bg-white">
+                        <!-- Dynamic editable list of items will go here -->
+                    </ul>
+                </div>
+            </div>
+            
+            <button onclick="startRanking()" id="start-button" class="w-full p-3 text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg font-bold text-lg transition duration-150 shadow-xl">
+                Start Custom Ranking
+            </button>
+        </div>
+
+        <!-- Comparison Section -->
+        <div id="comparison-section" class="hidden space-y-6 text-center">
+            
+            <h2 id="comparison-prompt" class="text-2xl font-bold text-gray-800">Which is your favorite?</h2>
+            
+            <div id="comparison-pairs" class="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-6">
+                <!-- Buttons populated by JS -->
+            </div>
+            
+            <!-- Progress Indicator -->
+            <div class="pt-4 space-y-2 text-center">
+                <p id="progress-indicator" class="text-lg font-medium text-indigo-600 leading-tight"></p>
+                <div class="w-full bg-gray-200 rounded-full h-3">
+                    <div id="progress-bar" class="bg-indigo-600 h-3 rounded-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Graph Visualization (Hidden) -->
+            <div id="graph-container" class="w-full min-h-64 h-80 overflow-hidden border-4 border-dashed border-indigo-200 rounded-xl p-2 bg-indigo-50">
+                <svg id="ranking-graph" class="w-full h-full"></svg>
+            </div>
+            
+        </div>
+
+        <!-- Result Section -->
+        <div id="result-section" class="hidden space-y-4">
+            <h2 class="text-2xl font-bold text-center text-green-700">🎉 Ranking Complete! 🎉</h2>
+            <ol id="final-ranking-list" class="list-decimal list-inside space-y-2 p-4 border border-gray-200 bg-gray-50 rounded-lg">
+                <!-- List populated by JS -->
+            </ol>
+            <button onclick="resetApp()" class="w-full p-3 text-white bg-gray-500 hover:bg-gray-600 rounded-lg font-medium transition duration-150 shadow-md">
+                Start a New Ranking
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        // --- Helper to create item objects ---
+        const createItem = (name, image = null) => ({ name, image });
+
+        // --- Data Generation Helpers for Project Sekai ---
+        // Generates consistent URLs from sekai.best asset database
+        function getPjskUrl(id) {
+            const paddedId = String(id).padStart(3, '0');
+            return `https://storage.sekai.best/sekai-en-assets/character/member/res${paddedId}_no001/card_normal.png`;
+        }
+
+        const PROJECT_SEKAI_CHARS_LIST = [
+            { name: "Ichika Hoshino", image: "https://static.wikia.nocookie.net/projectsekai/images/1/11/Hoshino_Ichika_chibi.png" },
+            { name: "Saki Tenma", image: "https://static.wikia.nocookie.net/projectsekai/images/a/a2/Tenma_Saki_chibi.png" },
+            { name: "Honami Mochizuki", image: "https://static.wikia.nocookie.net/projectsekai/images/6/61/Mochizuki_Honami_chibi.png" },
+            { name: "Shiho Hinomori", image: "https://static.wikia.nocookie.net/projectsekai/images/a/ac/Hinomori_Shiho_chibi.png" },
+            { name: "Minori Hanasato", image: "https://static.wikia.nocookie.net/projectsekai/images/b/b1/Hanasato_Minori_chibi.png" },
+            { name: "Haruka Kiritani", image: "https://static.wikia.nocookie.net/projectsekai/images/e/e1/Kiritani_Haruka_chibi.png" },
+            { name: "Airi Momoi", image: "https://static.wikia.nocookie.net/projectsekai/images/c/cd/Momoi_Airi_chibi.png" },
+            { name: "Shizuku Hinomori", image: "https://static.wikia.nocookie.net/projectsekai/images/8/8c/Hinomori_Shizuku_chibi.png" },
+            { name: "Kohane Azusawa", image: "https://static.wikia.nocookie.net/projectsekai/images/b/b4/Azusawa_Kohane_chibi.png" },
+            { name: "An Shiraishi", image: "https://static.wikia.nocookie.net/projectsekai/images/a/aa/Shiraishi_An_chibi.png" },
+            { name: "Akito Shinonome", image: "https://static.wikia.nocookie.net/projectsekai/images/d/df/Shinonome_Akito_chibi.png" },
+            { name: "Toya Aoyagi", image: "https://static.wikia.nocookie.net/projectsekai/images/b/b1/Aoyagi_Toya_chibi.png" },
+            { name: "Tsukasa Tenma", image: "https://static.wikia.nocookie.net/projectsekai/images/7/75/Tenma_Tsukasa_chibi.png" },
+            { name: "Emu Otori", image: "https://static.wikia.nocookie.net/projectsekai/images/2/20/Otori_Emu_chibi.png" },
+            { name: "Nene Kusanagi", image: "https://static.wikia.nocookie.net/projectsekai/images/4/4e/Kusanagi_Nene_chibi.png" },
+            { name: "Rui Kamishiro", image: "https://static.wikia.nocookie.net/projectsekai/images/a/a4/Kamishiro_Rui_chibi.png" },
+            { name: "Kanade Yoisaki", image: "https://static.wikia.nocookie.net/projectsekai/images/b/bb/Yoisaki_Kanade_chibi.png" },
+            { name: "Mafuyu Asahina", image: "https://static.wikia.nocookie.net/projectsekai/images/a/aa/Asahina_Mafuyu_chibi.png" },
+            { name: "Ena Shinonome", image: "https://static.wikia.nocookie.net/projectsekai/images/2/2a/Shinonome_Ena_chibi.png" },
+            { name: "Mizuki Akiyama", image: "https://static.wikia.nocookie.net/projectsekai/images/a/ad/Akiyama_Mizuki_chibi.png" },
+            { name: "Hatsune Miku", image: "https://static.wikia.nocookie.net/projectsekai/images/6/66/Hatsune_Miku_-_VIRTUAL_SINGER_Chibi.png" },
+            { name: "Kagamine Rin", image: "https://static.wikia.nocookie.net/projectsekai/images/f/f1/Kagamine_Rin_-_VIRTUAL_SINGER_Chibi.png" },
+            { name: "Kagamine Len", image: "https://static.wikia.nocookie.net/projectsekai/images/4/45/Kagamine_Len_-_VIRTUAL_SINGER_Chibi.png" },
+            { name: "Megurine Luka", image: "https://static.wikia.nocookie.net/projectsekai/images/7/76/Megurine_Luka_-_VIRTUAL_SINGER_Chibi.png" },
+            { name: "MEIKO", image: "https://static.wikia.nocookie.net/projectsekai/images/c/c1/MEIKO_-_VIRTUAL_SINGER_Chibi.png" },
+            { name: "KAITO", image: "https://static.wikia.nocookie.net/projectsekai/images/c/c1/KAITO_-_VIRTUAL_SINGER_Chibi.png" }
+        ];
+
+        const PROJECT_SEKAI_PRESET = {
+            title: "Project Sekai Characters",
+            prompt: "Who is your favorite character?",
+            items: PROJECT_SEKAI_CHARS_LIST
+        };
+
+        // VIRTUAL SINGERS PRESET
+        const VIRTUAL_SINGERS_PRESET = {
+            title: "Virtual Singers Ranking",
+            prompt: "Which Vocaloid is the best?",
+            items: [
+                { name: "Hatsune Miku", image: "https://static.wikia.nocookie.net/projectsekai/images/6/66/Hatsune_Miku_-_VIRTUAL_SINGER_Chibi.png" },
+                { name: "Kagamine Rin", image: "https://static.wikia.nocookie.net/projectsekai/images/f/f1/Kagamine_Rin_-_VIRTUAL_SINGER_Chibi.png" },
+                { name: "Kagamine Len", image: "https://static.wikia.nocookie.net/projectsekai/images/4/45/Kagamine_Len_-_VIRTUAL_SINGER_Chibi.png" },
+                { name: "Megurine Luka", image: "https://static.wikia.nocookie.net/projectsekai/images/7/76/Megurine_Luka_-_VIRTUAL_SINGER_Chibi.png" },
+                { name: "MEIKO", image: "https://static.wikia.nocookie.net/projectsekai/images/c/c1/MEIKO_-_VIRTUAL_SINGER_Chibi.png" },
+                { name: "KAITO", image: "https://static.wikia.nocookie.net/projectsekai/images/c/c1/KAITO_-_VIRTUAL_SINGER_Chibi.png" },
+                { name: "GUMI", image: "https://static.wikia.nocookie.net/vocaloid/images/3/3b/GUMI_V4_design.png" }, 
+                { name: "IA", image: "https://static.wikia.nocookie.net/vocaloid/images/a/a2/IA_ROCKS.png" },
+                { name: "Kasane Teto", image: "https://kasaneteto.jp/img/illust/teto_yoshida.jpg" },
+                { name: "v4 flower", image: "https://static.wikia.nocookie.net/vocaloid/images/2/2f/Flower_v4_design_3.png" },
+                { name: "Yuzuki Yukari", image: "https://static.wikia.nocookie.net/vocaloid/images/b/b3/Yukari_Jun_design.png" }
+            ]
+        };
+
+        // NFL Teams with Logos
+        const NFL_TEAMS_PRESET = {
+            title: "NFL Teams Ranking",
+            prompt: "Which NFL team is better?",
+            items: [
+                { name: "Arizona Cardinals", image: "https://a.espncdn.com/i/teamlogos/nfl/500/ari.png" },
+                { name: "Atlanta Falcons", image: "https://a.espncdn.com/i/teamlogos/nfl/500/atl.png" },
+                { name: "Baltimore Ravens", image: "https://a.espncdn.com/i/teamlogos/nfl/500/bal.png" },
+                { name: "Buffalo Bills", image: "https://a.espncdn.com/i/teamlogos/nfl/500/buf.png" },
+                { name: "Carolina Panthers", image: "https://a.espncdn.com/i/teamlogos/nfl/500/car.png" },
+                { name: "Chicago Bears", image: "https://a.espncdn.com/i/teamlogos/nfl/500/chi.png" },
+                { name: "Cincinnati Bengals", image: "https://a.espncdn.com/i/teamlogos/nfl/500/cin.png" },
+                { name: "Cleveland Browns", image: "https://a.espncdn.com/i/teamlogos/nfl/500/cle.png" },
+                { name: "Dallas Cowboys", image: "https://a.espncdn.com/i/teamlogos/nfl/500/dal.png" },
+                { name: "Denver Broncos", image: "https://a.espncdn.com/i/teamlogos/nfl/500/den.png" },
+                { name: "Detroit Lions", image: "https://a.espncdn.com/i/teamlogos/nfl/500/det.png" },
+                { name: "Green Bay Packers", image: "https://a.espncdn.com/i/teamlogos/nfl/500/gb.png" },
+                { name: "Houston Texans", image: "https://a.espncdn.com/i/teamlogos/nfl/500/hou.png" },
+                { name: "Indianapolis Colts", image: "https://a.espncdn.com/i/teamlogos/nfl/500/ind.png" },
+                { name: "Jacksonville Jaguars", image: "https://a.espncdn.com/i/teamlogos/nfl/500/jax.png" },
+                { name: "Kansas City Chiefs", image: "https://a.espncdn.com/i/teamlogos/nfl/500/kc.png" },
+                { name: "Las Vegas Raiders", image: "https://a.espncdn.com/i/teamlogos/nfl/500/lv.png" },
+                { name: "Los Angeles Chargers", image: "https://a.espncdn.com/i/teamlogos/nfl/500/lac.png" },
+                { name: "Los Angeles Rams", image: "https://a.espncdn.com/i/teamlogos/nfl/500/lar.png" },
+                { name: "Miami Dolphins", image: "https://a.espncdn.com/i/teamlogos/nfl/500/mia.png" },
+                { name: "Minnesota Vikings", image: "https://a.espncdn.com/i/teamlogos/nfl/500/min.png" },
+                { name: "New England Patriots", image: "https://a.espncdn.com/i/teamlogos/nfl/500/ne.png" },
+                { name: "New Orleans Saints", image: "https://a.espncdn.com/i/teamlogos/nfl/500/no.png" },
+                { name: "New York Giants", image: "https://a.espncdn.com/i/teamlogos/nfl/500/nyg.png" },
+                { name: "New York Jets", image: "https://a.espncdn.com/i/teamlogos/nfl/500/nyj.png" },
+                { name: "Philadelphia Eagles", image: "https://a.espncdn.com/i/teamlogos/nfl/500/phi.png" },
+                { name: "Pittsburgh Steelers", image: "https://a.espncdn.com/i/teamlogos/nfl/500/pit.png" },
+                { name: "San Francisco 49ers", image: "https://a.espncdn.com/i/teamlogos/nfl/500/sf.png" },
+                { name: "Seattle Seahawks", image: "https://a.espncdn.com/i/teamlogos/nfl/500/sea.png" },
+                { name: "Tampa Bay Buccaneers", image: "https://a.espncdn.com/i/teamlogos/nfl/500/tb.png" },
+                { name: "Tennessee Titans", image: "https://a.espncdn.com/i/teamlogos/nfl/500/ten.png" },
+                { name: "Washington Commanders", image: "https://a.espncdn.com/i/teamlogos/nfl/500/wsh.png" }
+            ]
+        };
+
+
+        let items = []; // Now stores objects: { name, image }
+        let comparisonMatrix = []; 
+        let currentPair = null;
+        let totalDirectComparisons = 0;
+        
+        // Configuration
+        let appTitle = "The Ultimate Ranking Sorter";
+        let comparisonPrompt = "Which is your favorite?";
+
+        // --- DOM Elements ---
+        const inputTitle = document.getElementById('input-title');
+        const inputPrompt = document.getElementById('input-prompt');
+        const mainTitle = document.getElementById('main-title');
+        const comparisonPromptH2 = document.getElementById('comparison-prompt');
+        const setupSection = document.getElementById('setup-section');
+        const comparisonSection = document.getElementById('comparison-section');
+        const resultSection = document.getElementById('result-section');
+        const comparisonPairsDiv = document.getElementById('comparison-pairs');
+        const progressIndicator = document.getElementById('progress-indicator');
+        const finalRankingList = document.getElementById('final-ranking-list');
+        const itemListCountSpan = document.getElementById('item-list-count');
+        const itemListContainer = document.getElementById('item-list-container');
+        const errorMessageDiv = document.getElementById('error-message');
+        const progressBar = document.getElementById('progress-bar');
+
+        // --- Item List Management ---
+        const getFocusIndex = (input) => parseInt(input.dataset.index, 10);
+
+        function createEditableItemLi(item, index, isPlaceholder = false) {
+            const li = document.createElement('li');
+            li.className = 'flex items-center p-1';
+            
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = isPlaceholder ? '' : item.name;
+            input.dataset.index = index;
+            input.dataset.placeholder = isPlaceholder ? 'true' : 'false';
+            input.placeholder = isPlaceholder ? 'Click here to add a new item...' : '';
+            input.className = 'editable-item-input flex-grow p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm';
+            
+            input.oninput = (e) => {
+                errorMessageDiv.classList.add('hidden');
+                const val = e.target.value;
+                const idx = getFocusIndex(e.target);
+                if (e.target.dataset.placeholder === 'false') {
+                    // Update the name property of the object
+                    items[idx].name = val;
+                }
+            };
+
+            input.onblur = (e) => {
+                const val = e.target.value.trim();
+                const blurIndex = getFocusIndex(e.target);
+                const isCurrentPlaceholder = e.target.dataset.placeholder === 'true';
+
+                if (isCurrentPlaceholder) return;
+                
+                if (!val) {
+                    items.splice(blurIndex, 1);
+                    renderEditableList(-1); 
+                } else {
+                     items[blurIndex].name = val;
+                     itemListCountSpan.textContent = items.length;
+                }
+            };
+            
+            input.onkeydown = (e) => {
+                const inputElement = e.target;
+                const keyIndex = getFocusIndex(inputElement);
+                const isCurrentPlaceholder = inputElement.dataset.placeholder === 'true';
+                const val = inputElement.value.trim();
+                
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (isCurrentPlaceholder && val) {
+                        items.push(createItem(val)); // Create new object (image: null)
+                    } else if (!isCurrentPlaceholder) {
+                        items[keyIndex].name = val; 
+                    }
+                    renderEditableList(items.length); 
+                } else if ((e.key === 'Delete' || e.key === 'Backspace') && inputElement.value === '') {
+                    e.preventDefault();
+                    if (isCurrentPlaceholder) return;
+                    if (keyIndex < items.length) {
+                        inputElement.onblur = null; 
+                        items.splice(keyIndex, 1);
+                        renderEditableList(items.length);
+                    }
+                }
+            };
+
+            li.appendChild(input);
+            if (!isPlaceholder) {
+                const deleteButton = document.createElement('button');
+                deleteButton.onclick = () => { items.splice(index, 1); renderEditableList(); };
+                deleteButton.className = 'text-red-500 hover:text-red-700 transition duration-150 p-1 rounded-full hover:bg-red-100 ml-2';
+                deleteButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>`;
+                li.appendChild(deleteButton);
+            }
+            return li;
+        }
+
+        function renderEditableList(focusIndex = -1) {
+            // Filter out items with empty names
+            items = items.filter(item => item.name.trim() !== '');
+            itemListContainer.innerHTML = '';
+            itemListCountSpan.textContent = items.length;
+            
+            items.forEach((item, index) => {
+                const li = createEditableItemLi(item, index, false);
+                itemListContainer.appendChild(li);
+            });
+            const placeholderIndex = items.length;
+            const placeholderLi = createEditableItemLi(createItem(""), placeholderIndex, true);
+            itemListContainer.appendChild(placeholderLi);
+            
+            if (focusIndex >= 0) {
+                const inputToFocus = itemListContainer.querySelector(`input[data-index="${focusIndex}"]`);
+                if (inputToFocus) {
+                    inputToFocus.focus();
+                    const length = inputToFocus.value.length;
+                    inputToFocus.setSelectionRange(length, length);
+                }
+            }
+        }
+
+        function loadPresetForEditing(presetData) {
+            inputTitle.value = presetData.title;
+            inputPrompt.value = presetData.prompt;
+            // Deep copy items
+            items = presetData.items.map(i => ({...i}));
+            renderEditableList();
+            errorMessageDiv.classList.add('hidden');
+        }
+
+        function startPresetRanking(presetData) {
+            appTitle = presetData.title;
+            comparisonPrompt = presetData.prompt;
+            items = presetData.items.map(i => ({...i}));
+            startRanking();
+        }
+
+        // --- Core Ranking Functions (Simplified Pairwise Sort Logic) ---
+
+        function hasPath(startNode, targetNode, visited = new Set()) {
+            if (visited.has(startNode)) return false;
+            visited.add(startNode);
+            for (let i = 0; i < items.length; i++) {
+                if (comparisonMatrix[startNode][i] === 1) { 
+                    if (i === targetNode) return true;
+                    if (hasPath(i, targetNode, visited)) return true;
+                }
+            }
+            return false;
+        }
+
+        function isOrderKnown(indexA, indexB) {
+            // Check if there is a known path (direct or indirect)
+            if (hasPath(indexA, indexB)) return true;
+            if (hasPath(indexB, indexA)) return true;
+            return false;
+        }
+
+        function findNextPair() {
+            const unknownPairs = [];
+            const N = items.length;
+            for (let i = 0; i < N; i++) {
+                for (let j = i + 1; j < N; j++) {
+                    if (!isOrderKnown(i, j)) {
+                        unknownPairs.push([i, j]);
+                    }
+                }
+            }
+            if (unknownPairs.length === 0) return null;
+            // Pick a random unknown pair
+            return unknownPairs[Math.floor(Math.random() * unknownPairs.length)];
+        }
+        
+        function countKnownPairs() {
+            let count = 0;
+            const N = items.length;
+            for (let i = 0; i < N; i++) {
+                for (let j = i + 1; j < N; j++) {
+                    if (isOrderKnown(i, j)) count++;
+                }
+            }
+            return count;
+        }
+
+        function countDirectComparisons() {
+            let count = 0;
+            const N = items.length;
+            for (let i = 0; i < N; i++) {
+                for (let j = i + 1; j < N; j++) {
+                    if (comparisonMatrix[i][j] !== 0) count++;
+                }
+            }
+            return count;
+        }
+        
+        function countDirectWins(itemIndex) {
+            let wins = 0;
+            for (let j = 0; j < items.length; j++) {
+                if (comparisonMatrix[itemIndex][j] === 1) wins++;
+            }
+            return wins;
+        }
+
+        function topologicalSort() {
+            const N = items.length;
+            const inDegree = new Array(N).fill(0);
+            const queue = [];
+            const sortedIndices = [];
+            
+            // Calculate in-degrees based on all inferred paths (transitive closure)
+            for (let i = 0; i < N; i++) {
+                for (let j = 0; j < N; j++) {
+                    if (i !== j && hasPath(j, i)) inDegree[i]++;
+                }
+            }
+            
+            // Initialize queue with nodes that have an in-degree of 0 (the highest ranked candidates)
+            for (let i = 0; i < N; i++) {
+                if (inDegree[i] === 0) queue.push(i);
+            }
+            
+            // Standard Topological Sort (Kahn's algorithm adaptation)
+            while (queue.length > 0) {
+                const u = queue.shift(); 
+                sortedIndices.push(u); 
+                
+                // For all nodes 'v' that 'u' dominates
+                for (let v = 0; v < N; v++) {
+                    // Check for path u -> v (direct or transitive)
+                    if (u !== v && hasPath(u, v)) {
+                        // Decrement in-degree of v
+                        inDegree[v]--;
+                        // If in-degree becomes 0, v is ready to be added to the queue
+                        if (inDegree[v] === 0) queue.push(v);
+                    }
+                }
+            }
+            
+            // Fallback/Tie-breaking: If the sort didn't include all items, use direct wins to rank the remaining
+            if (sortedIndices.length < N) {
+                const remainingIndices = items.map((_, i) => i).filter(i => !sortedIndices.includes(i));
+                remainingIndices.sort((a, b) => countDirectWins(b) - countDirectWins(a));
+                sortedIndices.push(...remainingIndices);
+            }
+
+
+            return sortedIndices.map(index => ({
+                item: items[index], // Pass full object
+                directWins: countDirectWins(index)
+            }));
+        }
+        
+        // --- Control Flow ---
+
+        function startRanking() {
+            items = items.filter(item => item.name.trim() !== '');
+            if (items.length < 2) {
+                errorMessageDiv.classList.remove('hidden');
+                return;
+            }
+            
+            const N = items.length;
+            comparisonMatrix = Array(N).fill(0).map(() => Array(N).fill(0)); 
+            totalDirectComparisons = 0;
+
+            errorMessageDiv.classList.add('hidden');
+            mainTitle.textContent = appTitle;
+            comparisonPromptH2.textContent = comparisonPrompt;
+            setupSection.classList.add('hidden');
+            comparisonSection.classList.remove('hidden');
+            resultSection.classList.add('hidden');
+            
+            askNextComparison();
+        }
+
+        function askNextComparison() {
+            currentPair = findNextPair();
+            const N = items.length;
+            const totalPairs = N * (N - 1) / 2;
+
+            if (!currentPair) {
+                currentPair = null; 
+                showResults();
+                return;
+            }
+            
+            const knownPairs = countKnownPairs();
+            totalDirectComparisons = countDirectComparisons();
+            const progress = (knownPairs / totalPairs) * 100;
+            const progressPercent = Math.floor(progress); 
+
+            progressIndicator.innerHTML = `
+                Comparisons: ${totalDirectComparisons}<br>
+                Progress: <span class="font-bold">${knownPairs}/${totalPairs} (${progressPercent}%)</span>
+            `;
+            progressBar.style.width = `${progress}%`;
+            
+            const [indexA, indexB] = currentPair;
+            const itemA = items[indexA];
+            const itemB = items[indexB];
+            
+            // Fallback handler for broken images
+            const onerror = "this.onerror=null;this.src='https://placehold.co/100x100/e5e7eb/4b5563?text=' + encodeURIComponent(this.alt.split(' ')[0]);";
+
+            const imageA = itemA.image ? `<img src="${itemA.image}" alt="${itemA.name}" class="item-image" onerror="${onerror}">` : '';
+            const imageB = itemB.image ? `<img src="${itemB.image}" alt="${itemB.name}" class="item-image" onerror="${onerror}">` : '';
+
+            // Render buttons with images if available
+            comparisonPairsDiv.innerHTML = `
+                <button onclick="recordComparison(${indexA}, ${indexB})"
+                        class="item-button p-4 w-full flex flex-col items-center justify-center bg-blue-100 text-blue-800 border-2 border-blue-300 hover:bg-blue-200 rounded-xl transition duration-150 shadow-lg text-lg font-semibold text-center focus:outline-none focus:ring-4 focus:ring-blue-300">
+                    ${imageA}
+                    <span>${itemA.name}</span>
+                </button>
+                <div class="p-2 text-xl font-bold text-gray-700 flex items-center justify-center">OR</div>
+                <button onclick="recordComparison(${indexB}, ${indexA})"
+                        class="item-button p-4 w-full flex flex-col items-center justify-center bg-red-100 text-red-800 border-2 border-red-300 hover:bg-red-200 rounded-xl transition duration-150 shadow-lg text-lg font-semibold text-center focus:outline-none focus:ring-4 focus:ring-red-300">
+                    ${imageB}
+                    <span>${itemB.name}</span>
+                </button>
+            `;
+        }
+
+        function recordComparison(winnerIndex, loserIndex) {
+            comparisonMatrix[winnerIndex][loserIndex] = 1;
+            comparisonMatrix[loserIndex][winnerIndex] = -1; 
+            askNextComparison();
+        }
+        
+        function showResults() {
+            comparisonSection.classList.add('hidden');
+            resultSection.classList.remove('hidden');
+            mainTitle.textContent = appTitle;
+            const finalOrder = topologicalSort();
+            
+            // Fallback handler for results
+            const onerror = "this.onerror=null;this.src='https://placehold.co/100x100/e5e7eb/4b5563?text=' + encodeURIComponent(this.alt.split(' ')[0]);";
+
+            finalRankingList.innerHTML = finalOrder.map((data, index) => {
+                const rankClass = index === 0 ? 'font-extrabold text-lg text-yellow-700' : 'font-medium text-gray-800';
+                return `
+                <li class="${rankClass} flex items-center space-x-3 p-2 bg-white rounded-lg border-b border-gray-100">
+                    <span class="text-xl w-6 text-center">${index + 1}.</span>
+                    ${data.item.image ? `<img src="${data.item.image}" alt="${data.item.name}" class="h-8 w-8 object-contain rounded-full shadow-sm" onerror="${onerror}">` : ''}
+                    <span class="text-indigo-600 truncate">${data.item.name}</span> 
+                    <span class="text-sm text-gray-500 font-normal ml-auto flex-shrink-0">(Wins: ${data.directWins})</span>
+                </li>`;
+            }).join('');
+        }
+        
+        function resetApp() {
+            items = [];
+            comparisonMatrix = [];
+            currentPair = null;
+            totalDirectComparisons = 0;
+            inputTitle.value = "The Ultimate Ranking Sorter";
+            inputPrompt.value = "Which is your favorite?";
+            mainTitle.textContent = "The Ultimate Ranking Sorter";
+            renderEditableList();
+            setupSection.classList.remove('hidden');
+            comparisonSection.classList.add('hidden');
+            resultSection.classList.add('hidden');
+            comparisonPairsDiv.innerHTML = '';
+            finalRankingList.innerHTML = '';
+            progressBar.style.width = '0%';
+        }
+
+        window.onload = () => {
+            renderEditableList(); 
+        };
+    </script>
+</body>
+</html>
