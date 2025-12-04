@@ -8,6 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     
     <!-- Configure Tailwind to use the Inter font -->
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -284,6 +285,10 @@
         let comparisonMatrix = []; 
         let currentPair = null;
         let totalDirectComparisons = 0;
+        
+        // D3 force graph state
+        let graphNodes = [];
+        let graphSimulation = null;
         
         // Configuration
         let appTitle = "The Ultimate Ranking Sorter";
@@ -582,7 +587,10 @@
             `;
             progressBar.style.width = `${progress}%`;
             
-            const [indexA, indexB] = currentPair;
+            let [indexA, indexB] = currentPair;
+            if (Math.random() < 0.5) {
+                [indexA, indexB] = [indexB, indexA];
+            }
             const itemA = items[indexA];
             const itemB = items[indexB];
             
@@ -605,7 +613,182 @@
                     ${imageB}
                     <span>${itemB.name}</span>
                 </button>
-            `;
+                `;
+
+            renderForceGraph(indexA, indexB);
+        }
+
+        // --- D3 Force Graph for Comparison State ---
+        function renderForceGraph(currentA, currentB) {
+            const svg = d3.select("#ranking-graph");
+            const width = svg.node().clientWidth || 600;
+            const height = svg.node().clientHeight || 320;
+
+            // Initialize or update persistent nodes array
+            if (graphNodes.length !== items.length) {
+                // Reinitialize nodes if count changed
+                graphNodes = items.map((item, i) => ({
+                    id: i,
+                    name: item.name,
+                    x: width / 2 + 120 * Math.cos(2 * Math.PI * i / items.length),
+                    y: height / 2 + 120 * Math.sin(2 * Math.PI * i / items.length)
+                }));
+            } else {
+                // Update node names (keep positions)
+                graphNodes.forEach((node, i) => {
+                    node.name = items[i].name;
+                });
+            }
+
+            // Build non-redundant edges (direct known orderings only)
+            const edges = [];
+            const N = items.length;
+            function hasTransitivePath(a, b) {
+                if (a === b) return false;
+                const visited = new Set();
+                function dfs(x) {
+                    if (x === b) return true;
+                    visited.add(x);
+                    for (let j = 0; j < N; j++) {
+                        if (comparisonMatrix[x][j] === 1 && !visited.has(j)) {
+                            if (dfs(j)) return true;
+                        }
+                    }
+                    return false;
+                }
+                return dfs(a);
+            }
+            for (let i = 0; i < N; i++) {
+                for (let j = 0; j < N; j++) {
+                    if (comparisonMatrix[i][j] === 1) {
+                        let redundant = false;
+                        for (let k = 0; k < N; k++) {
+                            if (k !== i && k !== j && comparisonMatrix[i][k] === 1 && hasTransitivePath(k, j)) {
+                                redundant = true;
+                                break;
+                            }
+                        }
+                        if (!redundant) {
+                            edges.push({source: j, target: i});
+                        }
+                    }
+                }
+            }
+
+            // Stop previous simulation if it exists
+            if (graphSimulation) {
+                graphSimulation.stop();
+            }
+
+            // Create or restart simulation with persistent nodes
+            graphSimulation = d3.forceSimulation(graphNodes)
+                .force("center", d3.forceCenter(width / 2, height / 2))
+                .force("collide", d3.forceCollide(40))
+                .force("link", d3.forceLink(edges).id(d => d.id).distance(80).strength(0.7))
+                .alpha(0.3)
+                .alphaDecay(0.02);
+
+            // Clear and redraw SVG
+            svg.selectAll("*").remove();
+
+            svg.append("defs").append("marker")
+                .attr("id", "arrowhead")
+                .attr("viewBox", "0 -5 10 10")
+                .attr("refX", 22)
+                .attr("refY", 0)
+                .attr("markerWidth", 8)
+                .attr("markerHeight", 8)
+                .attr("orient", "auto")
+                .append("path")
+                .attr("d", "M0,-5L10,0L0,5")
+                .attr("fill", "#6366f1");
+
+            const link = svg.append("g")
+                .attr("stroke", "#6366f1")
+                .attr("stroke-width", 2)
+                .selectAll("line")
+                .data(edges)
+                .enter().append("line")
+                .attr("marker-end", "url(#arrowhead)");
+
+            const node = svg.append("g")
+                .selectAll("circle")
+                .data(graphNodes)
+                .enter().append("circle")
+                .attr("r", 22)
+                .attr("fill", d => {
+                    if (d.id === currentA) return "#bfdbfe";
+                    if (d.id === currentB) return "#fecaca";
+                    return "#e5e7eb";
+                })
+                .attr("stroke", d => {
+                    if (d.id === currentA) return "#2563eb";
+                    if (d.id === currentB) return "#dc2626";
+                    return "#6366f1";
+                })
+                .attr("stroke-width", 3)
+                .call(d3.drag()
+                    .on("start", dragstarted)
+                    .on("drag", dragged)
+                    .on("end", dragended));
+
+            let hoveredNode = null;
+            const label = svg.append("text")
+                .attr("visibility", "hidden")
+                .attr("font-size", "1rem")
+                .attr("font-weight", "bold")
+                .attr("fill", "#374151")
+                .attr("text-anchor", "middle")
+                .attr("dominant-baseline", "middle")
+                .attr("pointer-events", "none");
+
+            node.on("mouseover", function(event, d) {
+                hoveredNode = d;
+                label.text(d.name)
+                    .attr("x", hoveredNode.x)
+                    .attr("y", hoveredNode.y)
+                    .attr("visibility", "visible");
+            })
+            .on("mouseout", function() {
+                hoveredNode = null;
+                label.attr("visibility", "hidden");
+            });
+
+            graphSimulation.on("tick", () => {
+                graphNodes.forEach(d => {
+                    d.x = Math.max(24, Math.min(width - 24, d.x));
+                    d.y = Math.max(24, Math.min(height - 24, d.y));
+                });
+                link
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+                node
+                    .attr("cx", d => d.x)
+                    .attr("cy", d => d.y);
+                if (hoveredNode) {
+                    label
+                        .attr("x", hoveredNode.x)
+                        .attr("y", hoveredNode.y)
+                        .attr("visibility", "visible");
+                }
+            });
+
+            function dragstarted(event, d) {
+                if (!event.active) graphSimulation.alphaTarget(0.3).restart();
+                d.fx = d.x;
+                d.fy = d.y;
+            }
+            function dragged(event, d) {
+                d.fx = event.x;
+                d.fy = event.y;
+            }
+            function dragended(event, d) {
+                if (!event.active) graphSimulation.alphaTarget(0);
+                d.fx = null;
+                d.fy = null;
+            }
         }
 
         function recordComparison(winnerIndex, loserIndex) {
