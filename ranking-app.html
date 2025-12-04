@@ -155,8 +155,15 @@
                 </div>
             </div>
 
+            <!-- Graph Toggle Button -->
+            <div class="text-center">
+                <button onclick="toggleGraph()" id="graph-toggle-btn" class="px-4 py-2 text-sm font-medium text-indigo-600 bg-white border border-indigo-300 rounded-lg hover:bg-indigo-50 transition duration-150 shadow-sm">
+                    Show Graph Visualization
+                </button>
+            </div>
+
             <!-- Graph Visualization (Hidden) -->
-            <div id="graph-container" class="w-full min-h-64 h-80 overflow-hidden border-4 border-dashed border-indigo-200 rounded-xl p-2 bg-indigo-50">
+            <div id="graph-container" class="hidden w-full min-h-64 h-80 overflow-hidden border-4 border-dashed border-indigo-200 rounded-xl p-2 bg-indigo-50">
                 <svg id="ranking-graph" class="w-full h-full"></svg>
             </div>
             
@@ -838,6 +845,18 @@
         window.onload = () => {
             renderEditableList(); 
         };
+
+        function toggleGraph() {
+            const container = document.getElementById('graph-container');
+            const btn = document.getElementById('graph-toggle-btn');
+            if (container.classList.contains('hidden')) {
+                container.classList.remove('hidden');
+                btn.textContent = 'Hide Graph Visualization';
+            } else {
+                container.classList.add('hidden');
+                btn.textContent = 'Show Graph Visualization';
+            }
+        }
     </script>
 </body>
 </html>
