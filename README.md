@@ -15,6 +15,7 @@ This repository contains a portfolio of personal projects built with modern web 
 - **Yard Sale Tracker App** - An application for tracking yard sale items and transactions
 - **Restaurant Speed Run** - A fun restaurant-themed application
 - **Ranking App** - An application for ranking and comparing items
+  - ✨ **NEW:** AI-powered item generation! Describe what you want to rank and let AI generate the list for you
 
 ## Development
 
