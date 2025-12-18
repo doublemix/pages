@@ -48,8 +48,8 @@ jobs:
               repo: context.repo.repo,
               issue_number: prNumber,
               body: `## 🧹 PR Preview Cleaned Up
-
-The preview site for this PR has been removed.
-
-Thank you for your contribution! 🎉`,
+              
+              The preview site for this PR has been removed.
+              
+              Thank you for your contribution! 🎉`,
             });

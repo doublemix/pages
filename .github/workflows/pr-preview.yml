@@ -59,15 +59,15 @@ jobs:
             );
 
             const commentBody = `## 🚀 PR Preview Deployed
-
-Your preview is ready! Visit the deployed site at:
-
-**🔗 [Preview Site](${previewUrl})**
-
-This preview will be updated automatically when you push new changes to this PR.
-
----
-<sub>Preview for commit ${context.payload.pull_request.head.sha.substring(0, 7)}</sub>`;
+            
+            Your preview is ready! Visit the deployed site at:
+            
+            **🔗 [Preview Site](${previewUrl})**
+            
+            This preview will be updated automatically when you push new changes to this PR.
+            
+            ---
+            <sub>Preview for commit ${context.payload.pull_request.head.sha.substring(0, 7)}</sub>`;
 
             if (botComment) {
               await github.rest.issues.updateComment({
