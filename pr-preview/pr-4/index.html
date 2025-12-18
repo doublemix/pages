@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My GitHub Projects</title>
+    <!-- Tailwind CSS CDN for simple styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body {
+        font-family: "Inter", sans-serif;
+        min-height: 100vh; /* Ensure body takes full viewport height */
+      }
+    </style>
+  </head>
+  <body
+    class="bg-gradient-to-br from-blue-50 to-indigo-100 text-gray-800 flex items-center justify-center p-4"
+  >
+    <div
+      class="bg-white rounded-xl shadow-lg p-6 sm:p-8 w-full max-w-2xl text-center"
+    >
+      <h1
+        class="text-3xl sm:text-4xl font-bold text-indigo-700 mb-6 border-b-2 pb-2 border-indigo-200"
+      >
+        Welcome to My Projects!
+      </h1>
+
+      <p class="text-base sm:text-lg text-gray-600 mb-8">
+        Explore some of the applications and projects I've built.
+      </p>
+
+      <div class="space-y-4">
+        <!-- Link to the Yard Sale Tracker subproject -->
+        <a
+          href="./yard-sale-tracker/"
+          class="block w-full py-3 px-6 bg-indigo-500 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-600 transition duration-200 ease-in-out transform hover:scale-105 flex items-center justify-center gap-2"
+        >
+          <i class="fas fa-cash-register"></i>
+          <span>Yard Sale Tracker App</span>
+        </a>
+
+        <a
+          href="./restaurant-speed-run.html"
+          class="block w-full py-3 px-6 bg-indigo-500 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-600 transition duration-200 ease-in-out transform hover:scale-105 flex items-center justify-center gap-2"
+        >
+          <span>Restaurant Speed Run</span>
+        </a>
+
+        <a
+          href="./ranking-app.html"
+          class="block w-full py-3 px-6 bg-indigo-500 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-600 transition duration-200 ease-in-out transform hover:scale-105 flex items-center justify-center gap-2"
+        >
+          <span>Ranking App</span>
+        </a>
+
+        <!-- Add more project links here as needed -->
+        <!--
+            <a href="./another-project/"
+               class="block w-full py-3 px-6 bg-green-500 text-white font-semibold rounded-lg shadow-md hover:bg-green-600 transition duration-200 ease-in-out transform hover:scale-105
+                      flex items-center justify-center gap-2">
+                <i class="fas fa-code"></i>
+                <span>Another Project Name</span>
+            </a>
+            -->
+      </div>
+
+      <p class="text-xs text-gray-400 mt-8">Built with ❤️ using Gemini.</p>
+    </div>
+
+    <!-- Font Awesome for icons (if used) -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"
+    />
+  </body>
+</html>
