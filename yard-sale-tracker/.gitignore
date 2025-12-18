@@ -74,7 +74,6 @@ web_modules/
 .tern-port
 
 # Packages
-package-lock.json
 .yarn/
 /yarn.lock
 /npm-shrinkwrap.json
