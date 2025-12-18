@@ -1,0 +1,175 @@
+# .github/workflows/unified-deploy.yml
+name: Unified Deploy (Main + PR Previews)
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+  pull-requests: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout main repository
+        uses: actions/checkout@v4
+        with:
+          path: main
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Get open pull requests
+        id: get-prs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: pulls } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open'
+            });
+            
+            const prData = pulls.map(pr => ({
+              number: pr.number,
+              head_sha: pr.head.sha,
+              head_ref: pr.head.ref
+            }));
+            
+            core.setOutput('prs', JSON.stringify(prData));
+            console.log('Open PRs:', prData);
+
+      - name: Build main site
+        run: |
+          echo "🔨 Building Main Site..."
+          mkdir -p deploy_build/yard-sale-tracker
+          cp main/*.html deploy_build/
+          
+          cd main/yard-sale-tracker
+          npm ci
+          npm run build
+          cp -R dist/. ../../deploy_build/yard-sale-tracker/
+          cd ../..
+          echo "✅ Main site built successfully"
+
+      - name: Build PR previews
+        if: fromJson(steps.get-prs.outputs.prs)[0] != null
+        env:
+          PRS: ${{ steps.get-prs.outputs.prs }}
+        run: |
+          echo "Building PR previews..."
+          echo "$PRS" | jq -r '.[] | @base64' | while read -r pr_data; do
+            pr_info=$(echo "$pr_data" | base64 -d)
+            pr_number=$(echo "$pr_info" | jq -r '.number')
+            pr_sha=$(echo "$pr_info" | jq -r '.head_sha')
+            pr_ref=$(echo "$pr_info" | jq -r '.head_ref')
+            
+            echo "Building preview for PR #$pr_number (ref: $pr_ref, sha: $pr_sha)"
+            
+            # Create PR preview directory
+            mkdir -p "deploy_build/pr-preview/pr-$pr_number/yard-sale-tracker"
+            
+            # Checkout PR code
+            git clone --depth=1 --branch="$pr_ref" "https://github.com/${{ github.repository }}.git" "pr-$pr_number"
+            
+            # Build site for this PR
+            echo "🔨 Building PR #$pr_number..."
+            
+            # Copy HTML files
+            if [ -f "pr-$pr_number/index.html" ]; then
+              cp "pr-$pr_number"/*.html "deploy_build/pr-preview/pr-$pr_number/"
+              echo "✅ Copied HTML files for PR #$pr_number"
+            fi
+            
+            # Build yard-sale-tracker if it exists
+            if [ -d "pr-$pr_number/yard-sale-tracker" ]; then
+              cd "pr-$pr_number/yard-sale-tracker"
+              if [ -f "package.json" ]; then
+                if npm ci && npm run build; then
+                  cp -R dist/. "../../deploy_build/pr-preview/pr-$pr_number/yard-sale-tracker/"
+                  echo "✅ Successfully built yard-sale-tracker for PR #$pr_number"
+                else
+                  echo "❌ Build failed for PR #$pr_number"
+                  mkdir -p "../../deploy_build/pr-preview/pr-$pr_number/yard-sale-tracker/"
+                  echo "<h1>Build Failed for PR #$pr_number</h1><p>The build process failed.</p>" > "../../deploy_build/pr-preview/pr-$pr_number/yard-sale-tracker/index.html"
+                fi
+              fi
+              cd ../..
+            fi
+            
+            # Cleanup
+            rm -rf "pr-$pr_number"
+            
+            echo "✅ Built preview for PR #$pr_number"
+          done
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./deploy_build
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Comment on PR (if triggered by PR)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const deployedUrl = '${{ steps.deployment.outputs.page_url }}';
+            const previewUrl = `${deployedUrl}pr-preview/pr-${prNumber}/`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+            });
+
+            const botComment = comments.find(comment =>
+              comment.user.type === 'Bot' &&
+              comment.body.includes('🚀 PR Preview Deployed')
+            );
+
+            const commentBody = `## 🚀 PR Preview Deployed
+
+            Your preview is ready! Visit the deployed site at:
+
+            **🔗 [Preview Site](${previewUrl})**
+
+            📍 **Main Site**: [${deployedUrl}](${deployedUrl})
+
+            This preview is deployed alongside the main site and all other open PR previews.
+
+            ---
+            <sub>Preview for commit ${context.payload.pull_request.head.sha.substring(0, 7)}</sub>`;
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: commentBody,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: commentBody,
+              });
+            }

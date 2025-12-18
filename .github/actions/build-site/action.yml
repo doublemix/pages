@@ -1,0 +1,64 @@
+name: Build Site
+description: 'Builds the site (HTML files + yard-sale-tracker app)'
+
+inputs:
+  source-path:
+    description: 'Path to the source code'
+    required: true
+  output-path:
+    description: 'Path where built files should be placed'
+    required: true
+  site-name:
+    description: 'Name of the site (for logging)'
+    required: false
+    default: 'Site'
+
+runs:
+  using: composite
+  steps:
+    - name: Build ${{ inputs.site-name }}
+      shell: bash
+      run: |
+        echo "🔨 Building ${{ inputs.site-name }}..."
+        
+        # Create output directory structure
+        mkdir -p "${{ inputs.output-path }}/yard-sale-tracker"
+        
+        # Copy HTML files
+        if [ -f "${{ inputs.source-path }}/index.html" ]; then
+          cp "${{ inputs.source-path }}"/*.html "${{ inputs.output-path }}/"
+          echo "✅ Copied HTML files"
+        else
+          echo "⚠️ No HTML files found in ${{ inputs.source-path }}"
+        fi
+        
+        # Build yard-sale-tracker if it exists
+        if [ -d "${{ inputs.source-path }}/yard-sale-tracker" ]; then
+          cd "${{ inputs.source-path }}/yard-sale-tracker"
+          
+          if [ -f "package.json" ]; then
+            echo "📦 Installing dependencies for yard-sale-tracker..."
+            if npm ci; then
+              echo "🏗️ Building yard-sale-tracker..."
+              if npm run build; then
+                cp -R dist/. "${{ inputs.output-path }}/yard-sale-tracker/"
+                echo "✅ Successfully built yard-sale-tracker for ${{ inputs.site-name }}"
+              else
+                echo "❌ Build failed for yard-sale-tracker in ${{ inputs.site-name }}"
+                # Create error page
+                mkdir -p "${{ inputs.output-path }}/yard-sale-tracker/"
+                echo "<h1>Build Failed</h1><p>The yard-sale-tracker app failed to build for ${{ inputs.site-name }}.</p>" > "${{ inputs.output-path }}/yard-sale-tracker/index.html"
+              fi
+            else
+              echo "❌ npm install failed for ${{ inputs.site-name }}"
+              mkdir -p "${{ inputs.output-path }}/yard-sale-tracker/"
+              echo "<h1>Dependencies Failed</h1><p>Could not install dependencies for ${{ inputs.site-name }}.</p>" > "${{ inputs.output-path }}/yard-sale-tracker/index.html"
+            fi
+          else
+            echo "⚠️ No package.json found in yard-sale-tracker directory"
+          fi
+        else
+          echo "⚠️ No yard-sale-tracker directory found in ${{ inputs.source-path }}"
+        fi
+        
+        echo "🎉 Finished building ${{ inputs.site-name }}"
