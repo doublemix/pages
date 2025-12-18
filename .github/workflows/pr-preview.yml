@@ -1,0 +1,86 @@
+name: PR Preview Deployment
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  build-and-deploy-preview:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Prepare deployment directory
+        run: |
+          mkdir -p deploy_build/yard-sale-tracker
+          cp *.html deploy_build/
+
+      - name: Install dependencies and Build Yard Sale Tracker App
+        run: |
+          npm install
+          npm run build
+          cp -R dist/. ../deploy_build/yard-sale-tracker/
+        working-directory: ./yard-sale-tracker
+
+      - name: Deploy PR Preview
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./deploy_build
+          destination_dir: pr-preview/pr-${{ github.event.pull_request.number }}
+          keep_files: false
+
+      - name: Comment PR with preview URL
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const previewUrl = `https://doublemix.github.io/pages/pr-preview/pr-${prNumber}/`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+            });
+
+            const botComment = comments.find(comment =>
+              comment.user.type === 'Bot' &&
+              comment.body.includes('🚀 PR Preview Deployed')
+            );
+
+            const commentBody = `## 🚀 PR Preview Deployed
+            
+            Your preview is ready! Visit the deployed site at:
+            
+            **🔗 [Preview Site](${previewUrl})**
+            
+            This preview will be updated automatically when you push new changes to this PR.
+            
+            ---
+            <sub>Preview for commit ${context.payload.pull_request.head.sha.substring(0, 7)}</sub>`;
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: commentBody,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: commentBody,
+              });
+            }

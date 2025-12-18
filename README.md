@@ -27,3 +27,17 @@ The projects in this repository are built with various technologies including:
 ### Deployment
 
 The site is automatically deployed to GitHub Pages via GitHub Actions when changes are pushed to the `master` branch.
+
+#### PR Deploy Previews
+
+Every pull request automatically generates a preview deployment, allowing you to test changes before merging:
+
+- **Automatic Deployment**: When you open or update a PR, a preview site is automatically deployed
+- **Preview URL**: A comment with the preview URL will be posted on your PR (e.g., `https://doublemix.github.io/pages/pr-preview/pr-123/`)
+- **Updates**: The preview site updates automatically with each new commit to the PR
+- **Cleanup**: Preview sites are automatically removed when the PR is closed or merged
+
+This enables:
+- Testing changes in a real environment before merging
+- Easier code reviews with visual verification
+- Catching potential issues early in the development process
