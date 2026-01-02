@@ -172,14 +172,29 @@
         <!-- Result Section -->
         <div id="result-section" class="hidden space-y-4">
             <h2 class="text-2xl font-bold text-center text-green-700">🎉 Ranking Complete! 🎉</h2>
+            <p id="total-comparisons-display" class="text-center text-lg font-medium text-indigo-600"></p>
             <ol id="final-ranking-list" class="list-decimal list-inside space-y-2 p-4 border border-gray-200 bg-gray-50 rounded-lg">
                 <!-- List populated by JS -->
             </ol>
+            
             <button onclick="resetApp()" class="w-full p-3 text-white bg-gray-500 hover:bg-gray-600 rounded-lg font-medium transition duration-150 shadow-md">
                 Start a New Ranking
             </button>
         </div>
 
+    </div>
+
+    <!-- Item Details Pop-over Dialog (outside main container) -->
+    <div id="item-details-overlay" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onclick="if(event.target === this) hideItemDetails()">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 max-h-[80vh] overflow-hidden" onclick="event.stopPropagation()">
+            <div class="flex justify-between items-start p-4 border-b border-gray-200">
+                <h3 id="item-details-title" class="text-xl font-bold text-indigo-800"></h3>
+                <button onclick="hideItemDetails()" class="text-gray-400 hover:text-gray-600 font-bold text-2xl leading-none" aria-label="Close details">&times;</button>
+            </div>
+            <div id="item-details-content" class="p-4 overflow-y-auto max-h-[calc(80vh-80px)]">
+                <!-- Details populated by JS -->
+            </div>
+        </div>
     </div>
 
     <script>
@@ -292,6 +307,7 @@
         let comparisonMatrix = []; 
         let currentPair = null;
         let totalDirectComparisons = 0;
+        let comparisonHistory = []; // Stores all comparisons: { winnerIndex, loserIndex }
         
         // D3 force graph state
         let graphNodes = [];
@@ -381,6 +397,42 @@
                         renderEditableList(items.length);
                     }
                 }
+            };
+
+            input.onpaste = (e) => {
+                const pastedText = e.clipboardData.getData('text');
+                
+                // Check if the pasted text contains newlines (handle all line ending formats)
+                if (/\r?\n/.test(pastedText)) {
+                    e.preventDefault();
+                    
+                    // Split by newlines (handles both \n and \r\n) and filter out empty lines
+                    const newItems = pastedText
+                        .split(/\r?\n/)
+                        .map(line => line.trim())
+                        .filter(line => line.length > 0)
+                        .map(line => createItem(line));
+                    
+                    const inputElement = e.target;
+                    const keyIndex = getFocusIndex(inputElement);
+                    const isCurrentPlaceholder = inputElement.dataset.placeholder === 'true';
+                    
+                    if (isCurrentPlaceholder) {
+                        // Add all new items
+                        items.push(...newItems);
+                    } else {
+                        // Replace current item and insert the rest after it
+                        if (newItems.length > 0) {
+                            items[keyIndex].name = newItems[0].name;
+                            if (newItems.length > 1) {
+                                items.splice(keyIndex + 1, 0, ...newItems.slice(1));
+                            }
+                        }
+                    }
+                    
+                    renderEditableList();
+                }
+                // If no newlines, let the default paste behavior work
             };
 
             li.appendChild(input);
@@ -500,6 +552,14 @@
             return wins;
         }
 
+        function countDirectLosses(itemIndex) {
+            let losses = 0;
+            for (let j = 0; j < items.length; j++) {
+                if (comparisonMatrix[itemIndex][j] === -1) losses++;
+            }
+            return losses;
+        }
+
         function topologicalSort() {
             const N = items.length;
             const inDegree = new Array(N).fill(0);
@@ -545,7 +605,9 @@
 
             return sortedIndices.map(index => ({
                 item: items[index], // Pass full object
-                directWins: countDirectWins(index)
+                itemIndex: index,
+                directWins: countDirectWins(index),
+                directLosses: countDirectLosses(index)
             }));
         }
         
@@ -561,6 +623,7 @@
             const N = items.length;
             comparisonMatrix = Array(N).fill(0).map(() => Array(N).fill(0)); 
             totalDirectComparisons = 0;
+            comparisonHistory = [];
 
             errorMessageDiv.classList.add('hidden');
             mainTitle.textContent = appTitle;
@@ -576,6 +639,9 @@
             currentPair = findNextPair();
             const N = items.length;
             const totalPairs = N * (N - 1) / 2;
+            
+            // Always update totalDirectComparisons before checking if done
+            totalDirectComparisons = countDirectComparisons();
 
             if (!currentPair) {
                 currentPair = null; 
@@ -584,7 +650,6 @@
             }
             
             const knownPairs = countKnownPairs();
-            totalDirectComparisons = countDirectComparisons();
             const progress = (knownPairs / totalPairs) * 100;
             const progressPercent = Math.floor(progress); 
 
@@ -607,18 +672,26 @@
             const imageA = itemA.image ? `<img src="${itemA.image}" alt="${itemA.name}" class="item-image" onerror="${onerror}">` : '';
             const imageB = itemB.image ? `<img src="${itemB.image}" alt="${itemB.name}" class="item-image" onerror="${onerror}">` : '';
 
+            // Calculate current records for both items
+            const winsA = countDirectWins(indexA);
+            const lossesA = countDirectLosses(indexA);
+            const winsB = countDirectWins(indexB);
+            const lossesB = countDirectLosses(indexB);
+
             // Render buttons with images if available
             comparisonPairsDiv.innerHTML = `
                 <button onclick="recordComparison(${indexA}, ${indexB})"
                         class="item-button p-4 w-full flex flex-col items-center justify-center bg-blue-100 text-blue-800 border-2 border-blue-300 hover:bg-blue-200 rounded-xl transition duration-150 shadow-lg text-lg font-semibold text-center focus:outline-none focus:ring-4 focus:ring-blue-300">
                     ${imageA}
                     <span>${itemA.name}</span>
+                    <span class="text-sm font-normal text-blue-600 mt-1">(${winsA}-${lossesA})</span>
                 </button>
                 <div class="p-2 text-xl font-bold text-gray-700 flex items-center justify-center">OR</div>
                 <button onclick="recordComparison(${indexB}, ${indexA})"
                         class="item-button p-4 w-full flex flex-col items-center justify-center bg-red-100 text-red-800 border-2 border-red-300 hover:bg-red-200 rounded-xl transition duration-150 shadow-lg text-lg font-semibold text-center focus:outline-none focus:ring-4 focus:ring-red-300">
                     ${imageB}
                     <span>${itemB.name}</span>
+                    <span class="text-sm font-normal text-red-600 mt-1">(${winsB}-${lossesB})</span>
                 </button>
                 `;
 
@@ -800,7 +873,8 @@
 
         function recordComparison(winnerIndex, loserIndex) {
             comparisonMatrix[winnerIndex][loserIndex] = 1;
-            comparisonMatrix[loserIndex][winnerIndex] = -1; 
+            comparisonMatrix[loserIndex][winnerIndex] = -1;
+            comparisonHistory.push({ winnerIndex, loserIndex });
             askNextComparison();
         }
         
@@ -810,17 +884,21 @@
             mainTitle.textContent = appTitle;
             const finalOrder = topologicalSort();
             
+            // Display total comparisons
+            const totalComparisonsDisplay = document.getElementById('total-comparisons-display');
+            totalComparisonsDisplay.textContent = `Total Comparisons Made: ${totalDirectComparisons}`;
+            
             // Fallback handler for results
             const onerror = "this.onerror=null;this.src='https://placehold.co/100x100/e5e7eb/4b5563?text=' + encodeURIComponent(this.alt.split(' ')[0]);";
 
             finalRankingList.innerHTML = finalOrder.map((data, index) => {
                 const rankClass = index === 0 ? 'font-extrabold text-lg text-yellow-700' : 'font-medium text-gray-800';
                 return `
-                <li class="${rankClass} flex items-center space-x-3 p-2 bg-white rounded-lg border-b border-gray-100">
+                <li class="${rankClass} flex items-center space-x-3 p-2 bg-white rounded-lg border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition duration-150" onclick="showItemDetails(${data.itemIndex})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showItemDetails(${data.itemIndex})}" tabindex="0">
                     <span class="text-xl w-6 text-center">${index + 1}.</span>
                     ${data.item.image ? `<img src="${data.item.image}" alt="${data.item.name}" class="h-8 w-8 object-contain rounded-full shadow-sm" onerror="${onerror}">` : ''}
                     <span class="text-indigo-600 truncate">${data.item.name}</span> 
-                    <span class="text-sm text-gray-500 font-normal ml-auto flex-shrink-0">(Wins: ${data.directWins})</span>
+                    <span class="text-sm text-gray-500 font-normal ml-auto flex-shrink-0">(${data.directWins}-${data.directLosses})</span>
                 </li>`;
             }).join('');
         }
@@ -830,6 +908,7 @@
             comparisonMatrix = [];
             currentPair = null;
             totalDirectComparisons = 0;
+            comparisonHistory = [];
             inputTitle.value = "The Ultimate Ranking Sorter";
             inputPrompt.value = "Which is your favorite?";
             mainTitle.textContent = "The Ultimate Ranking Sorter";
@@ -840,6 +919,7 @@
             comparisonPairsDiv.innerHTML = '';
             finalRankingList.innerHTML = '';
             progressBar.style.width = '0%';
+            hideItemDetails();
         }
 
         window.onload = () => {
@@ -856,6 +936,54 @@
                 container.classList.add('hidden');
                 btn.textContent = 'Show Graph Visualization';
             }
+        }
+
+        function showItemDetails(itemIndex) {
+            const item = items[itemIndex];
+            const overlay = document.getElementById('item-details-overlay');
+            const title = document.getElementById('item-details-title');
+            const content = document.getElementById('item-details-content');
+            
+            title.textContent = `${item.name} - Comparison Details`;
+            
+            // Get all comparisons involving this item
+            const itemComparisons = comparisonHistory.filter(
+                comp => comp.winnerIndex === itemIndex || comp.loserIndex === itemIndex
+            );
+            
+            if (itemComparisons.length === 0) {
+                content.innerHTML = '<p class="text-gray-600">No direct comparisons for this item.</p>';
+            } else {
+                content.innerHTML = `
+                    <p class="text-sm text-gray-700 mb-2 font-semibold">Direct Comparisons (${itemComparisons.length} total):</p>
+                    <ul class="space-y-1">
+                        ${itemComparisons.map(comp => {
+                            const isWin = comp.winnerIndex === itemIndex;
+                            const otherIndex = isWin ? comp.loserIndex : comp.winnerIndex;
+                            const otherItem = items[otherIndex];
+                            const resultText = isWin ? 'Won against' : 'Lost to';
+                            const resultClass = isWin ? 'text-green-700 bg-green-50' : 'text-red-700 bg-red-50';
+                            return `
+                                <li class="${resultClass} p-2 rounded text-sm border border-gray-200">
+                                    <span class="font-semibold">${resultText}:</span> ${otherItem.name}
+                                </li>
+                            `;
+                        }).join('')}
+                    </ul>
+                `;
+            }
+            
+            // Show overlay dialog
+            overlay.classList.remove('hidden');
+            // Prevent body scrolling when dialog is open
+            document.body.style.overflow = 'hidden';
+        }
+
+        function hideItemDetails() {
+            const overlay = document.getElementById('item-details-overlay');
+            overlay.classList.add('hidden');
+            // Re-enable body scrolling
+            document.body.style.overflow = '';
         }
     </script>
 </body>
