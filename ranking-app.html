@@ -176,6 +176,18 @@
             <ol id="final-ranking-list" class="list-decimal list-inside space-y-2 p-4 border border-gray-200 bg-gray-50 rounded-lg">
                 <!-- List populated by JS -->
             </ol>
+            
+            <!-- Item Details Modal -->
+            <div id="item-details-modal" class="hidden mt-4 p-4 border-2 border-indigo-300 bg-indigo-50 rounded-lg">
+                <div class="flex justify-between items-start mb-3">
+                    <h3 id="item-details-title" class="text-xl font-bold text-indigo-800"></h3>
+                    <button onclick="hideItemDetails()" class="text-indigo-600 hover:text-indigo-800 font-bold text-xl" aria-label="Close details">✕</button>
+                </div>
+                <div id="item-details-content" class="space-y-2">
+                    <!-- Details populated by JS -->
+                </div>
+            </div>
+            
             <button onclick="resetApp()" class="w-full p-3 text-white bg-gray-500 hover:bg-gray-600 rounded-lg font-medium transition duration-150 shadow-md">
                 Start a New Ranking
             </button>
@@ -293,6 +305,7 @@
         let comparisonMatrix = []; 
         let currentPair = null;
         let totalDirectComparisons = 0;
+        let comparisonHistory = []; // Stores all comparisons: { winnerIndex, loserIndex }
         
         // D3 force graph state
         let graphNodes = [];
@@ -382,6 +395,42 @@
                         renderEditableList(items.length);
                     }
                 }
+            };
+
+            input.onpaste = (e) => {
+                const pastedText = e.clipboardData.getData('text');
+                
+                // Check if the pasted text contains newlines (handle all line ending formats)
+                if (/\r?\n/.test(pastedText)) {
+                    e.preventDefault();
+                    
+                    // Split by newlines (handles both \n and \r\n) and filter out empty lines
+                    const newItems = pastedText
+                        .split(/\r?\n/)
+                        .map(line => line.trim())
+                        .filter(line => line.length > 0)
+                        .map(line => createItem(line));
+                    
+                    const inputElement = e.target;
+                    const keyIndex = getFocusIndex(inputElement);
+                    const isCurrentPlaceholder = inputElement.dataset.placeholder === 'true';
+                    
+                    if (isCurrentPlaceholder) {
+                        // Add all new items
+                        items.push(...newItems);
+                    } else {
+                        // Replace current item and insert the rest after it
+                        if (newItems.length > 0) {
+                            items[keyIndex].name = newItems[0].name;
+                            if (newItems.length > 1) {
+                                items.splice(keyIndex + 1, 0, ...newItems.slice(1));
+                            }
+                        }
+                    }
+                    
+                    renderEditableList();
+                }
+                // If no newlines, let the default paste behavior work
             };
 
             li.appendChild(input);
@@ -501,6 +550,14 @@
             return wins;
         }
 
+        function countDirectLosses(itemIndex) {
+            let losses = 0;
+            for (let j = 0; j < items.length; j++) {
+                if (comparisonMatrix[itemIndex][j] === -1) losses++;
+            }
+            return losses;
+        }
+
         function topologicalSort() {
             const N = items.length;
             const inDegree = new Array(N).fill(0);
@@ -546,7 +603,9 @@
 
             return sortedIndices.map(index => ({
                 item: items[index], // Pass full object
-                directWins: countDirectWins(index)
+                itemIndex: index,
+                directWins: countDirectWins(index),
+                directLosses: countDirectLosses(index)
             }));
         }
         
@@ -562,6 +621,7 @@
             const N = items.length;
             comparisonMatrix = Array(N).fill(0).map(() => Array(N).fill(0)); 
             totalDirectComparisons = 0;
+            comparisonHistory = [];
 
             errorMessageDiv.classList.add('hidden');
             mainTitle.textContent = appTitle;
@@ -801,7 +861,8 @@
 
         function recordComparison(winnerIndex, loserIndex) {
             comparisonMatrix[winnerIndex][loserIndex] = 1;
-            comparisonMatrix[loserIndex][winnerIndex] = -1; 
+            comparisonMatrix[loserIndex][winnerIndex] = -1;
+            comparisonHistory.push({ winnerIndex, loserIndex });
             askNextComparison();
         }
         
@@ -821,11 +882,11 @@
             finalRankingList.innerHTML = finalOrder.map((data, index) => {
                 const rankClass = index === 0 ? 'font-extrabold text-lg text-yellow-700' : 'font-medium text-gray-800';
                 return `
-                <li class="${rankClass} flex items-center space-x-3 p-2 bg-white rounded-lg border-b border-gray-100">
+                <li class="${rankClass} flex items-center space-x-3 p-2 bg-white rounded-lg border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition duration-150" onclick="showItemDetails(${data.itemIndex})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showItemDetails(${data.itemIndex})}" tabindex="0">
                     <span class="text-xl w-6 text-center">${index + 1}.</span>
                     ${data.item.image ? `<img src="${data.item.image}" alt="${data.item.name}" class="h-8 w-8 object-contain rounded-full shadow-sm" onerror="${onerror}">` : ''}
                     <span class="text-indigo-600 truncate">${data.item.name}</span> 
-                    <span class="text-sm text-gray-500 font-normal ml-auto flex-shrink-0">(Wins: ${data.directWins})</span>
+                    <span class="text-sm text-gray-500 font-normal ml-auto flex-shrink-0">(${data.directWins}-${data.directLosses})</span>
                 </li>`;
             }).join('');
         }
@@ -835,6 +896,7 @@
             comparisonMatrix = [];
             currentPair = null;
             totalDirectComparisons = 0;
+            comparisonHistory = [];
             inputTitle.value = "The Ultimate Ranking Sorter";
             inputPrompt.value = "Which is your favorite?";
             mainTitle.textContent = "The Ultimate Ranking Sorter";
@@ -845,6 +907,7 @@
             comparisonPairsDiv.innerHTML = '';
             finalRankingList.innerHTML = '';
             progressBar.style.width = '0%';
+            hideItemDetails();
         }
 
         window.onload = () => {
@@ -861,6 +924,52 @@
                 container.classList.add('hidden');
                 btn.textContent = 'Show Graph Visualization';
             }
+        }
+
+        function showItemDetails(itemIndex) {
+            const item = items[itemIndex];
+            const modal = document.getElementById('item-details-modal');
+            const title = document.getElementById('item-details-title');
+            const content = document.getElementById('item-details-content');
+            
+            title.textContent = `${item.name} - Comparison Details`;
+            
+            // Get all comparisons involving this item
+            const itemComparisons = comparisonHistory.filter(
+                comp => comp.winnerIndex === itemIndex || comp.loserIndex === itemIndex
+            );
+            
+            if (itemComparisons.length === 0) {
+                content.innerHTML = '<p class="text-gray-600">No direct comparisons for this item.</p>';
+            } else {
+                content.innerHTML = `
+                    <p class="text-sm text-gray-700 mb-2 font-semibold">Direct Comparisons (${itemComparisons.length} total):</p>
+                    <ul class="space-y-1">
+                        ${itemComparisons.map(comp => {
+                            const isWin = comp.winnerIndex === itemIndex;
+                            const otherIndex = isWin ? comp.loserIndex : comp.winnerIndex;
+                            const otherItem = items[otherIndex];
+                            const resultText = isWin ? 'Won against' : 'Lost to';
+                            const resultClass = isWin ? 'text-green-700 bg-green-50' : 'text-red-700 bg-red-50';
+                            return `
+                                <li class="${resultClass} p-2 rounded text-sm border border-gray-200">
+                                    <span class="font-semibold">${resultText}:</span> ${otherItem.name}
+                                </li>
+                            `;
+                        }).join('')}
+                    </ul>
+                `;
+            }
+            
+            modal.classList.remove('hidden');
+            // Respect user's motion preferences
+            const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            modal.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'nearest' });
+        }
+
+        function hideItemDetails() {
+            const modal = document.getElementById('item-details-modal');
+            modal.classList.add('hidden');
         }
     </script>
 </body>
