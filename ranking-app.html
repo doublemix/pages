@@ -637,6 +637,9 @@
             currentPair = findNextPair();
             const N = items.length;
             const totalPairs = N * (N - 1) / 2;
+            
+            // Always update totalDirectComparisons before checking if done
+            totalDirectComparisons = countDirectComparisons();
 
             if (!currentPair) {
                 currentPair = null; 
@@ -645,7 +648,6 @@
             }
             
             const knownPairs = countKnownPairs();
-            totalDirectComparisons = countDirectComparisons();
             const progress = (knownPairs / totalPairs) * 100;
             const progressPercent = Math.floor(progress); 
 
