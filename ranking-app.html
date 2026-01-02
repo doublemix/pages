@@ -172,6 +172,7 @@
         <!-- Result Section -->
         <div id="result-section" class="hidden space-y-4">
             <h2 class="text-2xl font-bold text-center text-green-700">🎉 Ranking Complete! 🎉</h2>
+            <p id="total-comparisons-display" class="text-center text-lg font-medium text-indigo-600"></p>
             <ol id="final-ranking-list" class="list-decimal list-inside space-y-2 p-4 border border-gray-200 bg-gray-50 rounded-lg">
                 <!-- List populated by JS -->
             </ol>
@@ -809,6 +810,10 @@
             resultSection.classList.remove('hidden');
             mainTitle.textContent = appTitle;
             const finalOrder = topologicalSort();
+            
+            // Display total comparisons
+            const totalComparisonsDisplay = document.getElementById('total-comparisons-display');
+            totalComparisonsDisplay.textContent = `Total Comparisons Made: ${totalDirectComparisons}`;
             
             // Fallback handler for results
             const onerror = "this.onerror=null;this.src='https://placehold.co/100x100/e5e7eb/4b5563?text=' + encodeURIComponent(this.alt.split(' ')[0]);";
