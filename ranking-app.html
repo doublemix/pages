@@ -351,8 +351,8 @@
                 imgPreview.alt = item.name;
                 imgPreview.className = 'h-8 w-8 object-contain rounded border border-gray-300';
                 imgPreview.onerror = function() {
-                    this.onerror=null;
-                    this.src='https://placehold.co/32x32/e5e7eb/4b5563?text=' + encodeURIComponent(item.name.split(' ')[0]);
+                    this.onerror = null;
+                    this.src = 'https://placehold.co/32x32/e5e7eb/4b5563?text=' + encodeURIComponent(item.name.split(' ')[0]);
                 };
                 inputContainer.appendChild(imgPreview);
             }
@@ -1044,7 +1044,7 @@
             const trimmedUrl = newImageUrl.trim();
             
             // Basic URL validation - check if it's empty or starts with http:// or https://
-            if (trimmedUrl && !trimmedUrl.match(/^https?:\/\/.+/i)) {
+            if (trimmedUrl && !trimmedUrl.startsWith('http://') && !trimmedUrl.startsWith('https://')) {
                 alert('Please enter a valid URL starting with http:// or https://');
                 return;
             }
