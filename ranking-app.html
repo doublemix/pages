@@ -336,6 +336,12 @@
         // --- Item List Management ---
         const getFocusIndex = (input) => parseInt(input.dataset.index, 10);
 
+        function isValidImageUrl(url) {
+            if (!url || !url.trim()) return false;
+            const trimmed = url.trim();
+            return trimmed.startsWith('http://') || trimmed.startsWith('https://');
+        }
+
         function createEditableItemLi(item, index, isPlaceholder = false) {
             const li = document.createElement('li');
             li.className = 'flex items-center p-1 gap-2';
@@ -352,7 +358,8 @@
                 imgPreview.className = 'h-8 w-8 object-contain rounded border border-gray-300';
                 imgPreview.onerror = function() {
                     this.onerror = null;
-                    this.src = 'https://placehold.co/32x32/e5e7eb/4b5563?text=' + encodeURIComponent(item.name.split(' ')[0]);
+                    const fallbackText = item.name.trim().split(' ')[0] || 'Item';
+                    this.src = 'https://placehold.co/32x32/e5e7eb/4b5563?text=' + encodeURIComponent(fallbackText);
                 };
                 inputContainer.appendChild(imgPreview);
             }
@@ -1043,8 +1050,8 @@
             
             const trimmedUrl = newImageUrl.trim();
             
-            // Basic URL validation - check if it's empty or starts with http:// or https://
-            if (trimmedUrl && !trimmedUrl.startsWith('http://') && !trimmedUrl.startsWith('https://')) {
+            // Basic URL validation using helper function
+            if (trimmedUrl && !isValidImageUrl(trimmedUrl)) {
                 alert('Please enter a valid URL starting with http:// or https://');
                 return;
             }
