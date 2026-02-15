@@ -81,8 +81,6 @@
             border-radius: 1rem;
             padding: 1rem;
             min-height: 150px;
-            max-height: 500px;
-            overflow-y: auto;
             border: 1px solid #e5e7eb;
         }
         .event-item {
@@ -264,32 +262,6 @@
         });
 
         const EventLog = React.memo(({ events, setEvents, startTime, openEditModal, endTimedEvent }) => {
-            const logRef = useRef(null);
-
-            // Logic to preserve scroll position on timer updates
-            useLayoutEffect(() => {
-                const logElement = logRef.current;
-                if (!logElement) return;
-
-                const { scrollHeight, clientHeight } = logElement;
-
-                const isNewEvent = scrollPosition.eventsLength < events.length;
-
-                if (isNewEvent || scrollPosition.wasAtBottom) {
-                    logElement.scrollTop = logElement.scrollHeight;
-                } else {
-                    logElement.scrollTop = scrollPosition.scrollTop;
-                }
-
-                scrollPosition = {
-                    scrollTop: logElement.scrollTop,
-                    scrollHeight: scrollHeight,
-                    clientHeight: clientHeight,
-                    wasAtBottom: (logElement.scrollTop + clientHeight >= scrollHeight - 1),
-                    eventsLength: events.length
-                };
-            });
-
             const deleteEvent = (id) => {
                 setEvents(prevEvents => {
                     const eventToDelete = prevEvents.find(e => e.id === id);
@@ -374,7 +346,7 @@
             return (
                 <div className="event-section">
                     <h2 className="text-gray-800 text-xl font-semibold">All Events</h2>
-                    <div id="unifiedEventLog" ref={logRef} className="unified-event-list">
+                    <div id="unifiedEventLog" className="unified-event-list">
                         {displayEvents.length === 0 ? (
                             <p className="text-gray-500 text-center py-4">No events logged yet. Start your visit!</p>
                         ) : (
@@ -437,53 +409,96 @@
             );
         };
 
+        function useIntervalUpdates (maybeIntervalMs) {
+            let [, setState] = useState(0)
+
+            useLayoutEffect(() => {
+                let intervalId = null;
+
+                if (typeof maybeIntervalMs === 'number') {
+                    intervalId = setInterval(() => {
+                        setState(x => x + 1)
+                    })
+                }
+
+                return () => {
+                    if (intervalId !== null) {
+                        clearInterval(intervalId);
+                    }
+                }
+            }, [maybeIntervalMs])
+        }
+
+        function applyUpdate (previousValue, valueOrUpdate) {
+            if (typeof valueOrUpdate === 'function') {
+                return valueOrUpdate(previousValue)
+            }
+            return valueOrUpdate
+        }
+
+        function useComponentSet(parentSet, property) {
+            return useCallback((valueOrUpdate) => parentSet(previousValue => {
+                let currentComponentValue = previousValue[property]
+                let newComponentValue = applyUpdate(currentComponentValue, valueOrUpdate)
+                if (Object.is(currentComponentValue, newComponentValue)) {
+                    return previousValue
+                }
+                return {
+                    ...previousValue,
+                    [property]: applyUpdate(previousValue[property], valueOrUpdate)
+                }
+            }), [parentSet])
+        }
+
+        function maybeCall(maybeFn, ...args) {
+            if (typeof maybeFn === 'function') {
+                return maybeFn(...args)
+            }
+            return maybeFn
+        }
+
+        function useStorage(storageKey, setStateInitializer, storage = localStorage) {
+            const [state, setState] = useState(() => {
+                try {
+                    const stored = storage.getItem(storageKey);
+                    return stored ? JSON.parse(stored) : maybeCall(setStateInitializer);
+                } catch {
+                    return maybeCall(setStateInitializer);
+                }
+            });
+
+            useEffect(() => {
+                storage.setItem(storageKey, JSON.stringify(state));
+            }, [state, storageKey, storage]);
+
+            return [state, setState];
+        }
+
         const App = () => {
-            const [startTime, setStartTime] = useState(0);
-            const [events, setEvents] = useState([]);
+            const [{ startTime, events }, setState] = useStorage("restaurant-speed-clock", () => {
+                return { startTime: null, events: [] }
+            }, sessionStorage)
 
             // Modal State
             const [isModalOpen, setIsModalOpen] = useState(false);
             const [editingEvent, setEditingEvent] = useState(null);
 
             // Derived state: Timer is running if startTime is set
-            const isRunning = startTime > 0;
+            const isRunning = startTime !== null;
 
-            // --- Timer Management Effect (FIXED) ---
-            useEffect(() => {
-                let intervalId = null;
-                
-                // If startTime is greater than 0, create and start the interval
-                if (startTime > 0) {
-                    intervalId = setInterval(() => {
-                        // Force update the events state to trigger a re-render, updating running times
-                        setEvents(prevEvents => [...prevEvents]);
-                    }, 1000);
-                }
+            useIntervalUpdates(isRunning ? 1000 : null)
 
-                // Cleanup function: clears the interval when startTime changes to 0 or component unmounts
-                return () => {
-                    if (intervalId) {
-                        clearInterval(intervalId);
-                    }
-                };
-            }, [startTime]); 
-            // The effect now only depends on startTime. When startTime changes to a positive number,
-            // it starts the interval. When it changes back to 0 (reset/finish), the cleanup runs.
-            // --- End Timer Management Effect ---
-
-
-            // --- Handlers ---
+            const setStartTime = useComponentSet(setState, "startTime")
+            const setEvents = useComponentSet(setState, "events")
 
             const handleStart = () => {
                 if (isRunning) return;
                 const now = Date.now();
-                setStartTime(now);
-                // The useEffect above will now correctly start the interval.
+                setStartTime(now)
             };
 
             const handleReset = () => {
-                // Setting startTime to 0 triggers the cleanup in useEffect
-                setStartTime(0);
+                setStartTime(null);
                 setEvents([]);
                 nextEventId = 0;
                 scrollPosition = { scrollTop: 0, scrollHeight: 0, clientHeight: 0, wasAtBottom: true, eventsLength: 0 };
@@ -492,8 +507,7 @@
             const handleFinish = () => {
                 if (!isRunning) return;
 
-                // Setting startTime to 0 triggers the cleanup in useEffect
-                setStartTime(0);
+                setStartTime(null);
 
                 const finishTime = Date.now();
 
@@ -617,7 +631,7 @@
 
 
             // Calculate current timer value
-            const elapsedTime = startTime === 0 ? 0 : Date.now() - startTime;
+            const elapsedTime = startTime === null ? 0 : Date.now() - startTime;
             const timerValue = formatTime(elapsedTime);
 
             return (
@@ -639,7 +653,7 @@
                             id="resetButton"
                             className="action-button bg-red-500 hover:bg-red-600 text-white flex-1"
                             onClick={handleReset}
-                            disabled={startTime === 0}
+                            disabled={startTime === null}
                         >
                             Reset
                         </button>
@@ -647,7 +661,7 @@
                             id="finishButton"
                             className="action-button bg-yellow-500 hover:bg-yellow-600 text-white flex-1"
                             onClick={handleFinish}
-                            disabled={startTime === 0 || !isRunning}
+                            disabled={startTime === null || !isRunning}
                         >
                             Finish
                         </button>
