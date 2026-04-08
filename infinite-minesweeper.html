@@ -1,0 +1,831 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pointer Lock Infinite Minesweeper</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: rgba(15, 23, 42, 0.7);
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --grid: rgba(148, 163, 184, 0.2);
+      --grid-major: rgba(226, 232, 240, 0.35);
+      --cell-fill: rgba(56, 189, 248, 0.35);
+      --cursor: #f8fafc;
+      --cursor-ring: rgba(248, 250, 252, 0.35);
+    }
+
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(circle at 20% 20%, #1e293b, #0f172a 55%);
+      color: var(--text);
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    #gridCanvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      cursor: crosshair;
+    }
+
+    .hud {
+      position: fixed;
+      top: 14px;
+      left: 14px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: var(--panel);
+      backdrop-filter: blur(4px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 13px;
+      line-height: 1.45;
+      max-width: 420px;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .hud strong {
+      color: #ffffff;
+    }
+
+    .hud .muted {
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gridCanvas"></canvas>
+
+  <div class="hud" id="hud">
+    <div><strong>Pointer Lock Infinite Minesweeper</strong></div>
+    <div class="muted">Click canvas to lock pointer. Left click reveals, right click (or Shift+click) toggles a flag.</div>
+    <div class="muted">Press Z to reveal and X to flag at the virtual cursor.</div>
+    <div class="muted">Press R to restart. Press C to continue after a mine.</div>
+    <div id="status">Status: unlocked</div>
+    <div id="gameStatus">Game: in progress</div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("gridCanvas");
+    const ctx = canvas.getContext("2d");
+    const statusEl = document.getElementById("status");
+    const gameStatusEl = document.getElementById("gameStatus");
+
+    const cellSize = 56;
+    const majorEvery = 5;
+    const mineChance = 0.18;
+    const maxMineChance = 1.0;
+    const mineChunkSize = 10;
+    const mineChunkJitter = 2;
+    const densityRampStart = 1;
+    const densityRampDistance = 2;
+    const firstClickSafeRadius = 2; // 2 => 5x5 safe area.
+    const worldSeed = 0x5f3759df;
+    const maxFloodStepsPerTick = 1200;
+
+    let width = 0;
+    let height = 0;
+    let centerX = 0;
+    let centerY = 0;
+
+    // Camera tracks where we are in the infinite world.
+    const camera = { x: 0, y: 0 };
+
+    // Virtual cursor lives in screen space but is unconstrained by pointer lock.
+    const virtualCursor = { x: 0, y: 0 };
+
+    // Tunable movement feel.
+    const pullStrength = 3.0;
+
+    const revealedCells = new Set();
+    const revealedMineCells = new Set();
+    const flaggedCells = new Set();
+    const mineCache = new Map();
+    const generatedChunks = new Set();
+    const hintCache = new Map();
+    let pointerLocked = false;
+    let gameOver = false;
+    let explodedCellKey = null;
+    let continueAvailable = false;
+    let firstRevealDone = false;
+    let firstSafeCenterX = 0;
+    let firstSafeCenterY = 0;
+    let floodGeneration = 0;
+    let floodQueue = [];
+    let floodQueued = new Set();
+    let floodScheduled = false;
+    let floodPaused = false;
+    let lastViewportToken = "";
+    let lastFrame = performance.now();
+
+    function resetGame() {
+      revealedCells.clear();
+      revealedMineCells.clear();
+      flaggedCells.clear();
+      mineCache.clear();
+      generatedChunks.clear();
+      hintCache.clear();
+      gameOver = false;
+      explodedCellKey = null;
+      continueAvailable = false;
+      firstRevealDone = false;
+      firstSafeCenterX = 0;
+      firstSafeCenterY = 0;
+      floodGeneration += 1;
+      floodQueue = [];
+      floodQueued.clear();
+      floodScheduled = false;
+      floodPaused = false;
+      lastViewportToken = "";
+      gameStatusEl.textContent = "Game: in progress";
+    }
+
+    function continueAfterMine() {
+      if (!gameOver || !continueAvailable || explodedCellKey === null) {
+        return;
+      }
+
+      revealedMineCells.add(explodedCellKey);
+      explodedCellKey = null;
+      continueAvailable = false;
+      gameOver = false;
+      gameStatusEl.textContent = "Game: continued after mine";
+
+      if (floodQueue.length > 0) {
+        scheduleFloodProcessing();
+      }
+    }
+
+    function resize() {
+      const dpr = window.devicePixelRatio || 1;
+      width = Math.floor(window.innerWidth);
+      height = Math.floor(window.innerHeight);
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      canvas.style.width = width + "px";
+      canvas.style.height = height + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      centerX = width * 0.5;
+      centerY = height * 0.5;
+
+      if (virtualCursor.x === 0 && virtualCursor.y === 0) {
+        virtualCursor.x = centerX;
+        virtualCursor.y = centerY;
+      }
+    }
+
+    function getCellKey(ix, iy) {
+      return ix + "," + iy;
+    }
+
+    function parseCellKey(key) {
+      const parts = key.split(",");
+      return { ix: Number(parts[0]), iy: Number(parts[1]) };
+    }
+
+    function getCellFromScreen(sx, sy) {
+      const world = screenToWorld(sx, sy);
+      return {
+        ix: Math.floor(world.x / cellSize),
+        iy: Math.floor(world.y / cellSize),
+      };
+    }
+
+    function getCellUnderCursor() {
+      return getCellFromScreen(virtualCursor.x, virtualCursor.y);
+    }
+
+    function getVisibleCellBounds(marginCells = 0) {
+      const topLeft = screenToWorld(0, 0);
+      const bottomRight = screenToWorld(width, height);
+      return {
+        startX: Math.floor(topLeft.x / cellSize) - 1 - marginCells,
+        endX: Math.floor(bottomRight.x / cellSize) + 1 + marginCells,
+        startY: Math.floor(topLeft.y / cellSize) - 1 - marginCells,
+        endY: Math.floor(bottomRight.y / cellSize) + 1 + marginCells,
+      };
+    }
+
+    function isInsideBounds(ix, iy, bounds) {
+      return ix >= bounds.startX && ix <= bounds.endX && iy >= bounds.startY && iy <= bounds.endY;
+    }
+
+    function getViewportToken() {
+      const b = getVisibleCellBounds(0);
+      return b.startX + "," + b.endX + "," + b.startY + "," + b.endY;
+    }
+
+    function isInFirstSafeArea(ix, iy) {
+      if (!firstRevealDone) {
+        return false;
+      }
+      return Math.abs(ix - firstSafeCenterX) <= firstClickSafeRadius && Math.abs(iy - firstSafeCenterY) <= firstClickSafeRadius;
+    }
+
+    function hash32(x, y, seed) {
+      let h = seed >>> 0;
+      h ^= Math.imul(x, 0x9e3779b1);
+      h ^= Math.imul(y, 0x85ebca6b);
+      h ^= h >>> 16;
+      h = Math.imul(h, 0x7feb352d);
+      h ^= h >>> 15;
+      h = Math.imul(h, 0x846ca68b);
+      h ^= h >>> 16;
+      return h >>> 0;
+    }
+
+    function createRng(seed) {
+      let s = seed >>> 0;
+      return function next() {
+        s = (s + 0x6d2b79f5) >>> 0;
+        let t = s;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    function getChunkCoord(i) {
+      return Math.floor(i / mineChunkSize);
+    }
+
+    function getChunkMineChance(chunkX, chunkY) {
+      const distance = Math.hypot(chunkX, chunkY);
+      const ramp = Math.max(0, Math.min(1, (distance - densityRampStart) / densityRampDistance));
+      return mineChance + (maxMineChance - mineChance) * ramp;
+    }
+
+    function generateChunkIfNeeded(chunkX, chunkY) {
+      const chunkKey = getCellKey(chunkX, chunkY);
+      if (generatedChunks.has(chunkKey)) {
+        return;
+      }
+
+      generatedChunks.add(chunkKey);
+
+      const chunkArea = mineChunkSize * mineChunkSize;
+      const rng = createRng(hash32(chunkX, chunkY, worldSeed));
+      const jitter = Math.floor(rng() * (mineChunkJitter * 2 + 1)) - mineChunkJitter;
+      const chunkMineChance = getChunkMineChance(chunkX, chunkY);
+      const targetMines = Math.max(0, Math.min(chunkArea, Math.round(chunkMineChance * chunkArea + jitter)));
+
+      const indices = [];
+      for (let i = 0; i < chunkArea; i += 1) {
+        indices.push(i);
+      }
+
+      for (let i = chunkArea - 1; i > 0; i -= 1) {
+        const j = Math.floor(rng() * (i + 1));
+        const tmp = indices[i];
+        indices[i] = indices[j];
+        indices[j] = tmp;
+      }
+
+      const mined = new Set(indices.slice(0, targetMines));
+      const baseX = chunkX * mineChunkSize;
+      const baseY = chunkY * mineChunkSize;
+
+      for (let localY = 0; localY < mineChunkSize; localY += 1) {
+        for (let localX = 0; localX < mineChunkSize; localX += 1) {
+          const idx = localY * mineChunkSize + localX;
+          const ix = baseX + localX;
+          const iy = baseY + localY;
+          mineCache.set(getCellKey(ix, iy), mined.has(idx));
+        }
+      }
+    }
+
+    function isMine(ix, iy) {
+      const key = getCellKey(ix, iy);
+      if (isInFirstSafeArea(ix, iy)) {
+        mineCache.set(key, false);
+        return false;
+      }
+
+      if (mineCache.has(key)) {
+        return mineCache.get(key);
+      }
+
+      const chunkX = getChunkCoord(ix);
+      const chunkY = getChunkCoord(iy);
+      generateChunkIfNeeded(chunkX, chunkY);
+
+      return mineCache.get(key) === true;
+    }
+
+    function getNeighborMineCount(ix, iy) {
+      const key = getCellKey(ix, iy);
+      if (hintCache.has(key)) {
+        return hintCache.get(key);
+      }
+
+      let mines = 0;
+      for (let oy = -1; oy <= 1; oy += 1) {
+        for (let ox = -1; ox <= 1; ox += 1) {
+          if (ox === 0 && oy === 0) {
+            continue;
+          }
+          if (isMine(ix + ox, iy + oy)) {
+            mines += 1;
+          }
+        }
+      }
+
+      hintCache.set(key, mines);
+      return mines;
+    }
+
+    function getNeighborFlagCount(ix, iy) {
+      let flags = 0;
+      for (let oy = -1; oy <= 1; oy += 1) {
+        for (let ox = -1; ox <= 1; ox += 1) {
+          if (ox === 0 && oy === 0) {
+            continue;
+          }
+          const neighborKey = getCellKey(ix + ox, iy + oy);
+          if (flaggedCells.has(neighborKey) || revealedMineCells.has(neighborKey)) {
+            flags += 1;
+          }
+        }
+      }
+      return flags;
+    }
+
+    function screenToWorld(sx, sy) {
+      return {
+        x: camera.x + (sx - centerX),
+        y: camera.y + (sy - centerY),
+      };
+    }
+
+    function worldToScreen(wx, wy) {
+      return {
+        x: wx - camera.x + centerX,
+        y: wy - camera.y + centerY,
+      };
+    }
+
+    function toggleFlagUnderCursor() {
+      if (gameOver) {
+        return;
+      }
+
+      const { ix, iy } = getCellUnderCursor();
+      const key = getCellKey(ix, iy);
+
+      if (revealedCells.has(key)) {
+        return;
+      }
+
+      if (flaggedCells.has(key)) {
+        flaggedCells.delete(key);
+      } else {
+        flaggedCells.add(key);
+      }
+    }
+
+    function revealCell(ix, iy) {
+      if (gameOver) {
+        return;
+      }
+
+      const startKey = getCellKey(ix, iy);
+      if (revealedCells.has(startKey) || flaggedCells.has(startKey)) {
+        return;
+      }
+
+      if (!firstRevealDone) {
+        firstRevealDone = true;
+        firstSafeCenterX = ix;
+        firstSafeCenterY = iy;
+      }
+
+      if (isMine(ix, iy)) {
+        revealedCells.add(startKey);
+        explodedCellKey = startKey;
+        continueAvailable = true;
+        gameOver = true;
+        gameStatusEl.textContent = "Game: exploded (press C to continue, R to restart)";
+        return;
+      }
+
+      enqueueFloodCell(ix, iy);
+      scheduleFloodProcessing();
+    }
+
+    function enqueueFloodCell(ix, iy) {
+      const key = getCellKey(ix, iy);
+      if (floodQueued.has(key)) {
+        return;
+      }
+      floodQueued.add(key);
+      floodQueue.push([ix, iy]);
+    }
+
+    function scheduleFloodProcessing() {
+      if (floodScheduled || gameOver) {
+        return;
+      }
+      floodScheduled = true;
+      const generation = floodGeneration;
+      setTimeout(() => processFloodChunk(generation), 0);
+    }
+
+    function processFloodChunk(generation) {
+      floodScheduled = false;
+      if (gameOver || generation !== floodGeneration) {
+        return;
+      }
+
+      const revealBounds = getVisibleCellBounds(2);
+      let steps = 0;
+      let progressed = false;
+      const deferred = [];
+
+      while (floodQueue.length > 0 && steps < maxFloodStepsPerTick) {
+        const [cx, cy] = floodQueue.pop();
+        const key = getCellKey(cx, cy);
+        floodQueued.delete(key);
+
+        if (!isInsideBounds(cx, cy, revealBounds)) {
+          deferred.push([cx, cy]);
+          steps += 1;
+          continue;
+        }
+
+        if (revealedCells.has(key) || flaggedCells.has(key) || isMine(cx, cy)) {
+          steps += 1;
+          continue;
+        }
+
+        progressed = true;
+        revealedCells.add(key);
+        const count = getNeighborMineCount(cx, cy);
+
+        if (count === 0) {
+          for (let oy = -1; oy <= 1; oy += 1) {
+            for (let ox = -1; ox <= 1; ox += 1) {
+              if (ox === 0 && oy === 0) {
+                continue;
+              }
+
+              const nx = cx + ox;
+              const ny = cy + oy;
+              const neighborKey = getCellKey(nx, ny);
+              if (revealedCells.has(neighborKey) || flaggedCells.has(neighborKey) || isMine(nx, ny)) {
+                continue;
+              }
+              enqueueFloodCell(nx, ny);
+            }
+          }
+        }
+
+        steps += 1;
+      }
+
+      for (let i = 0; i < deferred.length; i += 1) {
+        const [dx, dy] = deferred[i];
+        enqueueFloodCell(dx, dy);
+      }
+
+      if (floodQueue.length > 0 && !gameOver && generation === floodGeneration) {
+        if (progressed) {
+          floodPaused = false;
+          scheduleFloodProcessing();
+        } else {
+          floodPaused = true;
+        }
+      }
+    }
+
+    function revealCellUnderCursor() {
+      const { ix, iy } = getCellUnderCursor();
+      revealCell(ix, iy);
+    }
+
+    function chordReveal(ix, iy) {
+      const key = getCellKey(ix, iy);
+      if (!revealedCells.has(key) || gameOver) {
+        return;
+      }
+
+      const requiredFlags = getNeighborMineCount(ix, iy);
+      if (requiredFlags === 0) {
+        return;
+      }
+
+      const placedFlags = getNeighborFlagCount(ix, iy);
+      if (placedFlags !== requiredFlags) {
+        return;
+      }
+
+      for (let oy = -1; oy <= 1; oy += 1) {
+        for (let ox = -1; ox <= 1; ox += 1) {
+          if (ox === 0 && oy === 0) {
+            continue;
+          }
+
+          const nx = ix + ox;
+          const ny = iy + oy;
+          const neighborKey = getCellKey(nx, ny);
+          if (flaggedCells.has(neighborKey) || revealedCells.has(neighborKey)) {
+            continue;
+          }
+          revealCell(nx, ny);
+        }
+      }
+    }
+
+    function primaryActionUnderCursor() {
+      const { ix, iy } = getCellUnderCursor();
+      const key = getCellKey(ix, iy);
+      if (revealedCells.has(key)) {
+        chordReveal(ix, iy);
+        return;
+      }
+      revealCell(ix, iy);
+    }
+
+    function secondaryActionUnderCursor() {
+      toggleFlagUnderCursor();
+    }
+
+    function getNumberColor(count) {
+      switch (count) {
+        case 1:
+          return "#60a5fa";
+        case 2:
+          return "#34d399";
+        case 3:
+          return "#f87171";
+        case 4:
+          return "#a78bfa";
+        case 5:
+          return "#fb7185";
+        case 6:
+          return "#22d3ee";
+        case 7:
+          return "#cbd5e1";
+        case 8:
+          return "#fbbf24";
+        default:
+          return "#e2e8f0";
+      }
+    }
+
+    function drawGrid() {
+      ctx.clearRect(0, 0, width, height);
+
+      const visibleBounds = getVisibleCellBounds(0);
+      const { startX, endX, startY, endY } = visibleBounds;
+
+      const hovered = getCellUnderCursor();
+      const hoveredKey = getCellKey(hovered.ix, hovered.iy);
+
+      for (let iy = startY; iy <= endY; iy += 1) {
+        for (let ix = startX; ix <= endX; ix += 1) {
+          const key = getCellKey(ix, iy);
+          const worldX = ix * cellSize;
+          const worldY = iy * cellSize;
+          const screen = worldToScreen(worldX, worldY);
+
+          const revealed = revealedCells.has(key);
+          const flagged = flaggedCells.has(key);
+
+          if (revealed) {
+            ctx.fillStyle = "rgba(148, 163, 184, 0.1)";
+            ctx.fillRect(screen.x, screen.y, cellSize, cellSize);
+
+            if (gameOver && key === explodedCellKey) {
+              ctx.fillStyle = "rgba(239, 68, 68, 0.6)";
+              ctx.fillRect(screen.x, screen.y, cellSize, cellSize);
+
+              ctx.fillStyle = "#f8fafc";
+              ctx.beginPath();
+              ctx.arc(screen.x + cellSize * 0.5, screen.y + cellSize * 0.5, cellSize * 0.16, 0, Math.PI * 2);
+              ctx.fill();
+
+              ctx.strokeStyle = "rgba(15, 23, 42, 0.9)";
+              ctx.lineWidth = 2;
+              ctx.beginPath();
+              ctx.moveTo(screen.x + cellSize * 0.5, screen.y + cellSize * 0.18);
+              ctx.lineTo(screen.x + cellSize * 0.5, screen.y + cellSize * 0.82);
+              ctx.moveTo(screen.x + cellSize * 0.18, screen.y + cellSize * 0.5);
+              ctx.lineTo(screen.x + cellSize * 0.82, screen.y + cellSize * 0.5);
+              ctx.moveTo(screen.x + cellSize * 0.28, screen.y + cellSize * 0.28);
+              ctx.lineTo(screen.x + cellSize * 0.72, screen.y + cellSize * 0.72);
+              ctx.moveTo(screen.x + cellSize * 0.72, screen.y + cellSize * 0.28);
+              ctx.lineTo(screen.x + cellSize * 0.28, screen.y + cellSize * 0.72);
+              ctx.stroke();
+            } else if (revealedMineCells.has(key)) {
+              // ctx.fillStyle = "rgba(245, 158, 11, 0.35)";
+              ctx.fillRect(screen.x, screen.y, cellSize, cellSize);
+
+              const px = screen.x + cellSize * 0.3;
+              const py = screen.y + cellSize * 0.2;
+
+              ctx.fillStyle = "#fb923c";
+              ctx.beginPath();
+              ctx.moveTo(px, py);
+              ctx.lineTo(px + cellSize * 0.4, py + cellSize * 0.14);
+              ctx.lineTo(px, py + cellSize * 0.28);
+              ctx.closePath();
+              ctx.fill();
+
+              ctx.strokeStyle = "#e2e8f0";
+              ctx.lineWidth = 2;
+              ctx.beginPath();
+              ctx.moveTo(px, py);
+              ctx.lineTo(px, py + cellSize * 0.56);
+              ctx.stroke();
+
+              ctx.fillStyle = "rgba(15, 23, 42, 0.85)";
+              ctx.beginPath();
+              ctx.arc(px + cellSize * 0.2, py + cellSize * 0.15, cellSize * 0.05, 0, Math.PI * 2);
+              ctx.fill();
+            }
+
+            const count = getNeighborMineCount(ix, iy);
+            if (!revealedMineCells.has(key) && count > 0) {
+              ctx.fillStyle = getNumberColor(count);
+              ctx.font = "bold 22px Segoe UI";
+              ctx.textAlign = "center";
+              ctx.textBaseline = "middle";
+              ctx.fillText(String(count), screen.x + cellSize * 0.5, screen.y + cellSize * 0.54);
+            }
+          } else {
+            ctx.fillStyle = "rgba(15, 23, 42, 0.35)";
+            ctx.fillRect(screen.x, screen.y, cellSize, cellSize);
+
+            if (flagged) {
+              const px = screen.x + cellSize * 0.28;
+              const py = screen.y + cellSize * 0.2;
+              ctx.fillStyle = "#f43f5e";
+              ctx.beginPath();
+              ctx.moveTo(px, py);
+              ctx.lineTo(px + cellSize * 0.42, py + cellSize * 0.14);
+              ctx.lineTo(px, py + cellSize * 0.28);
+              ctx.closePath();
+              ctx.fill();
+
+              ctx.strokeStyle = "#e2e8f0";
+              ctx.lineWidth = 2;
+              ctx.beginPath();
+              ctx.moveTo(px, py);
+              ctx.lineTo(px, py + cellSize * 0.56);
+              ctx.stroke();
+            }
+          }
+
+          if (key === hoveredKey) {
+            ctx.strokeStyle = "rgba(248, 250, 252, 0.55)";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(screen.x + 1, screen.y + 1, cellSize - 2, cellSize - 2);
+          }
+        }
+      }
+
+      for (let ix = startX; ix <= endX; ix += 1) {
+        const worldX = ix * cellSize;
+        const sx = worldToScreen(worldX, 0).x;
+        ctx.beginPath();
+        ctx.lineWidth = ix % majorEvery === 0 ? 1.6 : 1;
+        ctx.strokeStyle = ix % majorEvery === 0 ? "rgba(226, 232, 240, 0.35)" : "rgba(148, 163, 184, 0.2)";
+        ctx.moveTo(sx, 0);
+        ctx.lineTo(sx, height);
+        ctx.stroke();
+      }
+
+      for (let iy = startY; iy <= endY; iy += 1) {
+        const worldY = iy * cellSize;
+        const sy = worldToScreen(0, worldY).y;
+        ctx.beginPath();
+        ctx.lineWidth = iy % majorEvery === 0 ? 1.6 : 1;
+        ctx.strokeStyle = iy % majorEvery === 0 ? "rgba(226, 232, 240, 0.35)" : "rgba(148, 163, 184, 0.2)";
+        ctx.moveTo(0, sy);
+        ctx.lineTo(width, sy);
+        ctx.stroke();
+      }
+    }
+
+    function drawVirtualCursor() {
+      ctx.beginPath();
+      ctx.fillStyle = "#f8fafc";
+      ctx.arc(virtualCursor.x, virtualCursor.y, 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.strokeStyle = "rgba(248, 250, 252, 0.35)";
+      ctx.lineWidth = 1;
+      ctx.arc(virtualCursor.x, virtualCursor.y, 10, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.strokeStyle = "rgba(248, 250, 252, 0.35)";
+      ctx.beginPath();
+      ctx.moveTo(virtualCursor.x - 14, virtualCursor.y);
+      ctx.lineTo(virtualCursor.x + 14, virtualCursor.y);
+      ctx.moveTo(virtualCursor.x, virtualCursor.y - 14);
+      ctx.lineTo(virtualCursor.x, virtualCursor.y + 14);
+      ctx.stroke();
+    }
+
+    function animate(now) {
+      const dt = Math.min((now - lastFrame) / 1000, 0.05);
+      lastFrame = now;
+
+      // Spring pull that gently drags the cursor back to center.
+      const pull = 1 - Math.exp(-pullStrength * dt);
+      const prevX = virtualCursor.x;
+      const prevY = virtualCursor.y;
+      virtualCursor.x += (centerX - virtualCursor.x) * pull;
+      virtualCursor.y += (centerY - virtualCursor.y) * pull;
+
+      // Keep the cursor anchored to the same world point while it recenters.
+      camera.x -= virtualCursor.x - prevX;
+      camera.y -= virtualCursor.y - prevY;
+
+      const viewportToken = getViewportToken();
+      if (viewportToken !== lastViewportToken) {
+        lastViewportToken = viewportToken;
+        if (floodPaused && floodQueue.length > 0 && !gameOver) {
+          floodPaused = false;
+          scheduleFloodProcessing();
+        }
+      }
+
+      drawGrid();
+      drawVirtualCursor();
+      requestAnimationFrame(animate);
+    }
+
+    canvas.addEventListener("mousedown", (event) => {
+      if (!pointerLocked) {
+        canvas.requestPointerLock();
+        return;
+      }
+
+      if (event.button === 2 || event.shiftKey) {
+        secondaryActionUnderCursor();
+      } else if (event.button === 0) {
+        primaryActionUnderCursor();
+      }
+    });
+
+    canvas.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+    });
+
+    document.addEventListener("mousemove", (event) => {
+      if (!pointerLocked) {
+        return;
+      }
+
+      virtualCursor.x += event.movementX;
+      virtualCursor.y += event.movementY;
+    });
+
+    document.addEventListener("pointerlockchange", () => {
+      pointerLocked = document.pointerLockElement === canvas;
+      statusEl.textContent = pointerLocked ? "Status: locked" : "Status: unlocked";
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "r" || event.key === "R") {
+        if (event.repeat) {
+          return;
+        }
+        resetGame();
+      } else if (event.key === "c" || event.key === "C") {
+        if (event.repeat) {
+          return;
+        }
+        continueAfterMine();
+      } else if (event.key === "z" || event.key === "Z") {
+        if (!pointerLocked) {
+          return;
+        }
+        event.preventDefault();
+        primaryActionUnderCursor();
+      } else if (event.key === "x" || event.key === "X") {
+        if (!pointerLocked) {
+          return;
+        }
+        event.preventDefault();
+        secondaryActionUnderCursor();
+      }
+    });
+
+    window.addEventListener("resize", resize);
+    resize();
+    requestAnimationFrame(animate);
+  </script>
+</body>
+</html>
