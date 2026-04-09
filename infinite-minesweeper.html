@@ -81,13 +81,13 @@
     const cellSize = 56;
     const majorEvery = 5;
     const mineChance = 0.18;
-    const maxMineChance = 1.0;
+    const maxMineChance = 0.38;
     const mineChunkSize = 10;
     const mineChunkJitter = 2;
-    const densityRampStart = 1;
-    const densityRampDistance = 2;
+    const densityRampStart = 3;
+    const densityRampDistance = 28;
     const firstClickSafeRadius = 2; // 2 => 5x5 safe area.
-    const worldSeed = 0x5f3759df;
+    const worldSeed = 0xDEADBEEF; // 0x5f3759df;
     const maxFloodStepsPerTick = 1200;
 
     let width = 0;
@@ -601,8 +601,10 @@
           const flagged = flaggedCells.has(key);
 
           if (revealed) {
-            ctx.fillStyle = "rgba(148, 163, 184, 0.1)";
-            ctx.fillRect(screen.x, screen.y, cellSize, cellSize);
+            if (!revealedMineCells.has(key)) {
+              ctx.fillStyle = "rgba(148, 163, 184, 0.1)";
+              ctx.fillRect(screen.x, screen.y, cellSize, cellSize);
+            }
 
             if (gameOver && key === explodedCellKey) {
               ctx.fillStyle = "rgba(239, 68, 68, 0.6)";
@@ -627,12 +629,12 @@
               ctx.stroke();
             } else if (revealedMineCells.has(key)) {
               // ctx.fillStyle = "rgba(245, 158, 11, 0.35)";
-              ctx.fillRect(screen.x, screen.y, cellSize, cellSize);
+              // ctx.fillRect(screen.x, screen.y, cellSize, cellSize);
 
               const px = screen.x + cellSize * 0.3;
               const py = screen.y + cellSize * 0.2;
 
-              ctx.fillStyle = "#fb923c";
+              ctx.fillStyle = "#f43f5e";
               ctx.beginPath();
               ctx.moveTo(px, py);
               ctx.lineTo(px + cellSize * 0.4, py + cellSize * 0.14);
@@ -649,12 +651,12 @@
 
               ctx.fillStyle = "rgba(15, 23, 42, 0.85)";
               ctx.beginPath();
-              ctx.arc(px + cellSize * 0.2, py + cellSize * 0.15, cellSize * 0.05, 0, Math.PI * 2);
+              ctx.arc(px + cellSize * 0.15, py + cellSize * 0.15, cellSize * 0.05, 0, Math.PI * 2);
               ctx.fill();
             }
 
             const count = getNeighborMineCount(ix, iy);
-            if (!revealedMineCells.has(key) && count > 0) {
+            if (key !== explodedCellKey && !revealedMineCells.has(key) && count > 0) {
               ctx.fillStyle = getNumberColor(count);
               ctx.font = "bold 22px Segoe UI";
               ctx.textAlign = "center";
@@ -662,8 +664,8 @@
               ctx.fillText(String(count), screen.x + cellSize * 0.5, screen.y + cellSize * 0.54);
             }
           } else {
-            ctx.fillStyle = "rgba(15, 23, 42, 0.35)";
-            ctx.fillRect(screen.x, screen.y, cellSize, cellSize);
+            // ctx.fillStyle = "rgba(15, 23, 42, 0.35)";
+            // ctx.fillRect(screen.x, screen.y, cellSize, cellSize);
 
             if (flagged) {
               const px = screen.x + cellSize * 0.28;
@@ -768,7 +770,7 @@
 
     canvas.addEventListener("mousedown", (event) => {
       if (!pointerLocked) {
-        canvas.requestPointerLock();
+        canvas.requestPointerLock({ unadjustedMovement: true });
         return;
       }
 
