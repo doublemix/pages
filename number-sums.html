@@ -157,10 +157,18 @@
       color: #f5a623;
       background: rgba(245,166,35,0.08);
       border: none;
-      font-size: 0.75rem;
-      line-height: 1.2;
+      font-size: 1rem;
+      line-height: 1.1;
+      position: relative;
+      padding: 0.15rem;
     }
-    .sum-cell .sum-current { display: block; font-size: 0.65rem; font-weight: 400; opacity: 0.7; }
+    .sum-cell .sum-indicators {
+      display: flex; justify-content: space-between;
+      font-size: 0.55rem; font-weight: 400;
+      position: absolute; bottom: 2px; left: 3px; right: 3px;
+    }
+    .sum-cell .sum-circled { color: #2ecc71; }
+    .sum-cell .sum-remaining { color: #888; }
     .sum-cell.satisfied { color: #2ecc71; background: rgba(46,204,113,0.08); }
     .sum-cell.over { color: #e94560; background: rgba(233,69,96,0.08); }
     .corner-cell { border: none; }
@@ -175,14 +183,22 @@
       font-size: 0.55rem; color: #f5a623; font-weight: 400;
       pointer-events: none;
     }
+    .region-indicators {
+      position: absolute; bottom: 2px; left: 3px; right: 3px;
+      display: flex; justify-content: space-between;
+      font-size: 0.5rem; font-weight: 400;
+      pointer-events: none;
+    }
+    .region-indicators .sum-circled { color: #2ecc71; }
+    .region-indicators .sum-remaining { color: #888; }
 
 
 
     /* Responsive */
     @media (max-width: 500px) {
       .grid-table td { width: 2.3rem; height: 2.3rem; font-size: 0.85rem; }
-      .sum-cell { font-size: 0.65rem; }
-      .sum-cell .sum-current { font-size: 0.55rem; }
+      .sum-cell { font-size: 0.8rem; }
+      .sum-cell .sum-indicators { font-size: 0.45rem; }
       #menu { padding: 1.5rem; }
       .tool-btn { width: 2.4rem; height: 2.4rem; font-size: 1.1rem; }
     }
@@ -246,6 +262,7 @@
     <div id="result-banner">
       <h3 id="result-title"></h3>
       <p id="result-msg"></p>
+      <button id="result-continue" style="display:none;">Continue</button>
       <button id="result-again">Play Again</button>
       <button id="result-menu">Menu</button>
     </div>
@@ -472,20 +489,29 @@
                 span.classList.add('region-sum');
                 span.textContent = regionSums[rid];
                 td.appendChild(span);
+                // Region indicators
+                const regionCircled = getRegionCircledSum(rid);
+                const regionRemaining = getRegionRemainingSum(rid);
+                const indSpan = document.createElement('span');
+                indSpan.classList.add('region-indicators');
+                indSpan.innerHTML = `<span class="sum-circled">${regionCircled}</span><span class="sum-remaining">${regionRemaining}</span>`;
+                td.appendChild(indSpan);
               }
             }
           } else if (r < size && c === size) {
-            // Row sum cell with current/target
+            // Row sum cell with indicators
             const currentSum = getRowCircledSum(r);
+            const remainingSum = getRowRemainingSum(r);
             td.classList.add('sum-cell');
-            td.innerHTML = `${rowSums[r]}<span class="sum-current">${currentSum}/${rowSums[r]}</span>`;
+            td.innerHTML = `${rowSums[r]}<span class="sum-indicators"><span class="sum-circled">${currentSum}</span><span class="sum-remaining">${remainingSum}</span></span>`;
             if (currentSum === rowSums[r]) td.classList.add('satisfied');
             else if (currentSum > rowSums[r]) td.classList.add('over');
           } else if (r === size && c < size) {
-            // Col sum cell with current/target
+            // Col sum cell with indicators
             const currentSum = getColCircledSum(c);
+            const remainingSum = getColRemainingSum(c);
             td.classList.add('sum-cell');
-            td.innerHTML = `${colSums[c]}<span class="sum-current">${currentSum}/${colSums[c]}</span>`;
+            td.innerHTML = `${colSums[c]}<span class="sum-indicators"><span class="sum-circled">${currentSum}</span><span class="sum-remaining">${remainingSum}</span></span>`;
             if (currentSum === colSums[c]) td.classList.add('satisfied');
             else if (currentSum > colSums[c]) td.classList.add('over');
           } else {
@@ -512,6 +538,32 @@
     function getColCircledSum(c) {
       let s = 0;
       for (let r = 0; r < board.size; r++) if (marks[r][c] === 'circled') s += board.grid[r][c];
+      return s;
+    }
+    function getRowRemainingSum(r) {
+      let s = 0;
+      for (let c = 0; c < board.size; c++) if (marks[r][c] !== 'struck') s += board.grid[r][c];
+      return s;
+    }
+    function getColRemainingSum(c) {
+      let s = 0;
+      for (let r = 0; r < board.size; r++) if (marks[r][c] !== 'struck') s += board.grid[r][c];
+      return s;
+    }
+    function getRegionCircledSum(rid) {
+      let s = 0;
+      const { size, grid, regions } = board;
+      for (let r = 0; r < size; r++)
+        for (let c = 0; c < size; c++)
+          if (regions[r][c] === rid && marks[r][c] === 'circled') s += grid[r][c];
+      return s;
+    }
+    function getRegionRemainingSum(rid) {
+      let s = 0;
+      const { size, grid, regions } = board;
+      for (let r = 0; r < size; r++)
+        for (let c = 0; c < size; c++)
+          if (regions[r][c] === rid && marks[r][c] !== 'struck') s += grid[r][c];
       return s;
     }
 
@@ -569,9 +621,17 @@
       resultTitle.textContent = title;
       resultMsg.textContent = msg;
       resultBanner.className = 'show ' + (isWin ? 'win' : 'lose');
+      const continueBtn = document.getElementById('result-continue');
+      continueBtn.style.display = (!isWin && prefs.mode === 'challenge') ? 'inline-block' : 'none';
     }
     function hideResult() {
       resultBanner.className = '';
+    }
+    function continueGame() {
+      gameOver = false;
+      lives = 1; // Give one life back to keep playing
+      hideResult();
+      renderGame();
     }
 
     // === Game Flow ===
@@ -581,7 +641,9 @@
       lives = 3;
       gameOver = false;
       activeTool = 'circle';
-      // Reset toolbar selection
+      // Reset toolbar selection and hide erase in challenge mode
+      const eraseBtn = document.querySelector('.tool-btn[data-tool="erase"]');
+      eraseBtn.style.display = prefs.mode === 'challenge' ? 'none' : '';
       document.querySelectorAll('.tool-btn').forEach(b => {
         b.classList.toggle('active-tool', b.dataset.tool === 'circle');
       });
@@ -608,6 +670,7 @@
     document.getElementById('back-btn').addEventListener('click', goToMenu);
     document.getElementById('result-again').addEventListener('click', startGame);
     document.getElementById('result-menu').addEventListener('click', goToMenu);
+    document.getElementById('result-continue').addEventListener('click', continueGame);
 
     // Init
     setupMenu();
