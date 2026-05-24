@@ -61,10 +61,10 @@
     .btn-start:hover { opacity: 0.9; transform: scale(1.02); }
 
     /* Game Styles */
-    #game { display: none; width: 100%; max-width: 600px; text-align: center; }
+    #game { display: none; width: 100%; max-width: 650px; text-align: center; }
     #game-header {
       display: flex; justify-content: space-between; align-items: center;
-      margin-bottom: 1rem; padding: 0 0.5rem;
+      margin-bottom: 0.6rem; padding: 0 0.5rem;
     }
     #game-header h2 { font-size: 1.3rem; }
     #lives-display { font-size: 1.1rem; color: #e94560; }
@@ -74,6 +74,47 @@
       font-size: 0.85rem;
     }
     #back-btn:hover { background: rgba(255,255,255,0.2); }
+
+    /* Toolbar */
+    #toolbar {
+      display: flex; justify-content: center; gap: 0.4rem;
+      margin-bottom: 0.8rem;
+    }
+    .tool-btn {
+      width: 2.8rem; height: 2.8rem;
+      border: 2px solid rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.06);
+      color: #ccc;
+      border-radius: 0.5rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.3rem; transition: all 0.15s;
+    }
+    .tool-btn:hover { background: rgba(255,255,255,0.12); }
+    .tool-btn.active-tool { border-color: #f5a623; background: rgba(245,166,35,0.15); color: #f5a623; }
+    .tool-btn svg { width: 1.3rem; height: 1.3rem; }
+
+    /* Win/Lose banner (inline, not overlay) */
+    #result-banner {
+      display: none; margin-bottom: 0.8rem;
+      padding: 0.8rem 1.2rem;
+      border-radius: 0.6rem;
+      text-align: center;
+    }
+    #result-banner.show { display: block; }
+    #result-banner.win {
+      background: rgba(46,204,113,0.15); border: 1px solid rgba(46,204,113,0.3);
+    }
+    #result-banner.lose {
+      background: rgba(233,69,96,0.15); border: 1px solid rgba(233,69,96,0.3);
+    }
+    #result-banner h3 { font-size: 1.4rem; margin-bottom: 0.3rem; }
+    #result-banner p { color: #aaa; font-size: 0.9rem; margin-bottom: 0.6rem; }
+    #result-banner button {
+      background: linear-gradient(90deg, #e94560, #f5a623);
+      border: none; color: #fff; padding: 0.5rem 1.2rem;
+      border-radius: 0.4rem; cursor: pointer; font-size: 0.9rem; font-weight: 600;
+      margin: 0 0.2rem;
+    }
 
     /* Grid */
     #grid-container {
@@ -116,8 +157,12 @@
       color: #f5a623;
       background: rgba(245,166,35,0.08);
       border: none;
+      font-size: 0.75rem;
+      line-height: 1.2;
     }
+    .sum-cell .sum-current { display: block; font-size: 0.65rem; font-weight: 400; opacity: 0.7; }
     .sum-cell.satisfied { color: #2ecc71; background: rgba(46,204,113,0.08); }
+    .sum-cell.over { color: #e94560; background: rgba(233,69,96,0.08); }
     .corner-cell { border: none; }
 
     /* Regions */
@@ -131,31 +176,15 @@
       pointer-events: none;
     }
 
-    /* Win/Lose overlay */
-    #overlay {
-      display: none; position: fixed; inset: 0;
-      background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
-      z-index: 100; align-items: center; justify-content: center;
-    }
-    #overlay.show { display: flex; }
-    #overlay-content {
-      background: rgba(255,255,255,0.08);
-      border: 1px solid rgba(255,255,255,0.15);
-      border-radius: 1rem; padding: 2rem 3rem; text-align: center;
-    }
-    #overlay-content h2 { font-size: 2rem; margin-bottom: 0.5rem; }
-    #overlay-content p { color: #aaa; margin-bottom: 1.5rem; }
-    #overlay-content button {
-      background: linear-gradient(90deg, #e94560, #f5a623);
-      border: none; color: #fff; padding: 0.7rem 1.5rem;
-      border-radius: 0.5rem; cursor: pointer; font-size: 1rem; font-weight: 600;
-      margin: 0 0.3rem;
-    }
+
 
     /* Responsive */
     @media (max-width: 500px) {
       .grid-table td { width: 2.3rem; height: 2.3rem; font-size: 0.85rem; }
+      .sum-cell { font-size: 0.65rem; }
+      .sum-cell .sum-current { font-size: 0.55rem; }
       #menu { padding: 1.5rem; }
+      .tool-btn { width: 2.4rem; height: 2.4rem; font-size: 1.1rem; }
     }
   </style>
 </head>
@@ -172,6 +201,8 @@
         <button data-val="5">5×5</button>
         <button data-val="6">6×6</button>
         <button data-val="7">7×7</button>
+        <button data-val="8">8×8</button>
+        <button data-val="9">9×9</button>
       </div>
     </div>
 
@@ -201,18 +232,25 @@
       <h2>Number Sums</h2>
       <span id="lives-display"></span>
     </div>
+    <div id="toolbar">
+      <button class="tool-btn active-tool" data-tool="circle" title="Select (circle)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"/></svg>
+      </button>
+      <button class="tool-btn" data-tool="strike" title="Cross out">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg>
+      </button>
+      <button class="tool-btn" data-tool="erase" title="Erase">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 20H7L3 16c-.6-.6-.6-1.5 0-2.1l10-10c.6-.6 1.5-.6 2.1 0l7 7c.6.6.6 1.5 0 2.1l-6 6"/><line x1="18" y1="13" x2="11" y2="20"/></svg>
+      </button>
+    </div>
+    <div id="result-banner">
+      <h3 id="result-title"></h3>
+      <p id="result-msg"></p>
+      <button id="result-again">Play Again</button>
+      <button id="result-menu">Menu</button>
+    </div>
     <div id="grid-container">
       <table class="grid-table" id="grid-table"></table>
-    </div>
-  </div>
-
-  <!-- OVERLAY -->
-  <div id="overlay">
-    <div id="overlay-content">
-      <h2 id="overlay-title"></h2>
-      <p id="overlay-msg"></p>
-      <button id="overlay-again">Play Again</button>
-      <button id="overlay-menu">Menu</button>
     </div>
   </div>
 
@@ -231,19 +269,20 @@
 
     // === State ===
     let prefs = getCookie('numSumsPrefs') || { size: 5, mode: 'zen', regions: 'off' };
-    let board = null; // { grid, solution, rowSums, colSums, regions, regionSums }
-    let marks = null; // 2D array: null, 'circled', 'struck'
+    let board = null;
+    let marks = null;
     let lives = 3;
     let gameOver = false;
+    let activeTool = 'circle'; // 'circle', 'strike', 'erase'
 
     // === DOM ===
     const menuEl = document.getElementById('menu');
     const gameEl = document.getElementById('game');
     const gridTable = document.getElementById('grid-table');
     const livesDisplay = document.getElementById('lives-display');
-    const overlay = document.getElementById('overlay');
-    const overlayTitle = document.getElementById('overlay-title');
-    const overlayMsg = document.getElementById('overlay-msg');
+    const resultBanner = document.getElementById('result-banner');
+    const resultTitle = document.getElementById('result-title');
+    const resultMsg = document.getElementById('result-msg');
 
     // === Menu Setup ===
     function setupMenu() {
@@ -265,9 +304,20 @@
       });
     }
 
+    // === Toolbar ===
+    function setupToolbar() {
+      const toolBtns = document.querySelectorAll('.tool-btn');
+      toolBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          toolBtns.forEach(b => b.classList.remove('active-tool'));
+          btn.classList.add('active-tool');
+          activeTool = btn.dataset.tool;
+        });
+      });
+    }
+
     // === Board Generation ===
     function generateBoard(size, useRegions) {
-      // Generate solution mask (~50% true)
       const solution = [];
       const targetCount = Math.round(size * size * 0.5);
       const indices = [];
@@ -281,7 +331,6 @@
         }
       }
 
-      // Generate grid numbers (1-9)
       const grid = [];
       for (let r = 0; r < size; r++) {
         grid.push([]);
@@ -290,7 +339,6 @@
         }
       }
 
-      // Compute row and col sums
       const rowSums = [];
       const colSums = [];
       for (let r = 0; r < size; r++) {
@@ -304,7 +352,6 @@
         colSums.push(s);
       }
 
-      // Regions
       let regions = null, regionSums = null;
       if (useRegions) {
         regions = generateRegions(size);
@@ -316,17 +363,15 @@
 
     function generateRegions(size) {
       const totalCells = size * size;
-      const numRegions = Math.max(3, Math.min(7, Math.floor(totalCells / 4)));
+      const numRegions = Math.max(3, Math.min(9, Math.floor(totalCells / 4)));
       const regionMap = Array.from({ length: size }, () => Array(size).fill(-1));
 
-      // Place seeds
       const cells = [];
       for (let r = 0; r < size; r++) for (let c = 0; c < size; c++) cells.push([r, c]);
       shuffle(cells);
       const seeds = cells.slice(0, numRegions);
       seeds.forEach(([r, c], i) => regionMap[r][c] = i);
 
-      // Grow regions using BFS-like expansion
       const queues = seeds.map(s => [s]);
       let unassigned = totalCells - numRegions;
       let maxIter = totalCells * 10;
@@ -347,7 +392,6 @@
         }
       }
 
-      // Fill any remaining unassigned cells
       for (let r = 0; r < size; r++) {
         for (let c = 0; c < size; c++) {
           if (regionMap[r][c] === -1) {
@@ -393,7 +437,6 @@
       const { size, grid, rowSums, colSums, regions, regionSums } = board;
       gridTable.innerHTML = '';
 
-      // Find which cell is top-left of each region (for sum label)
       let regionTopLeft = {};
       if (regions) {
         for (let r = 0; r < size; r++) {
@@ -409,17 +452,14 @@
         for (let c = 0; c <= size; c++) {
           const td = document.createElement('td');
           if (r < size && c < size) {
-            // Game cell
             td.classList.add('cell');
             td.dataset.row = r;
             td.dataset.col = c;
             td.textContent = grid[r][c];
 
-            // Mark state
             if (marks[r][c] === 'circled') td.classList.add('circled');
             else if (marks[r][c] === 'struck') td.classList.add('struck');
 
-            // Region borders
             if (regions) {
               const rid = regions[r][c];
               if (r === 0 || regions[r-1][c] !== rid) td.classList.add('region-border-top');
@@ -427,7 +467,6 @@
               if (c === 0 || regions[r][c-1] !== rid) td.classList.add('region-border-left');
               if (c === size-1 || regions[r][c+1] !== rid) td.classList.add('region-border-right');
 
-              // Region sum label on top-left cell of region
               if (regionTopLeft[rid] && regionTopLeft[rid][0] === r && regionTopLeft[rid][1] === c) {
                 const span = document.createElement('span');
                 span.classList.add('region-sum');
@@ -435,18 +474,20 @@
                 td.appendChild(span);
               }
             }
-
-            td.addEventListener('click', () => handleCellClick(r, c));
           } else if (r < size && c === size) {
-            // Row sum
+            // Row sum cell with current/target
+            const currentSum = getRowCircledSum(r);
             td.classList.add('sum-cell');
-            td.textContent = rowSums[r];
-            if (getRowCircledSum(r) === rowSums[r]) td.classList.add('satisfied');
+            td.innerHTML = `${rowSums[r]}<span class="sum-current">${currentSum}/${rowSums[r]}</span>`;
+            if (currentSum === rowSums[r]) td.classList.add('satisfied');
+            else if (currentSum > rowSums[r]) td.classList.add('over');
           } else if (r === size && c < size) {
-            // Col sum
+            // Col sum cell with current/target
+            const currentSum = getColCircledSum(c);
             td.classList.add('sum-cell');
-            td.textContent = colSums[c];
-            if (getColCircledSum(c) === colSums[c]) td.classList.add('satisfied');
+            td.innerHTML = `${colSums[c]}<span class="sum-current">${currentSum}/${colSums[c]}</span>`;
+            if (currentSum === colSums[c]) td.classList.add('satisfied');
+            else if (currentSum > colSums[c]) td.classList.add('over');
           } else {
             td.classList.add('corner-cell');
           }
@@ -475,33 +516,34 @@
     }
 
     // === Interaction ===
-    function handleCellAction(r, c, action) {
+    function handleCellAction(r, c) {
       if (gameOver) return;
+
       if (prefs.mode === 'zen') {
-        // Cycle: null -> circled -> struck -> null (left click)
-        // Right click directly toggles struck
-        if (action === 'cycle') {
-          if (marks[r][c] === null) marks[r][c] = 'circled';
-          else if (marks[r][c] === 'circled') marks[r][c] = 'struck';
-          else marks[r][c] = null;
-        } else if (action === 'strike') {
+        if (activeTool === 'circle') {
+          marks[r][c] = marks[r][c] === 'circled' ? null : 'circled';
+        } else if (activeTool === 'strike') {
           marks[r][c] = marks[r][c] === 'struck' ? null : 'struck';
+        } else if (activeTool === 'erase') {
+          marks[r][c] = null;
         }
       } else {
         // Challenge mode
         if (marks[r][c] !== null) return;
+        if (activeTool === 'erase') return; // erase does nothing on unmarked in challenge
+
+        const action = activeTool; // 'circle' or 'strike'
         const isInSolution = board.solution[r][c];
         const correct = (action === 'circle' && isInSolution) || (action === 'strike' && !isInSolution);
         if (correct) {
           marks[r][c] = action === 'circle' ? 'circled' : 'struck';
         } else {
           lives--;
-          // Auto-correct
           marks[r][c] = isInSolution ? 'circled' : 'struck';
           if (lives <= 0) {
             gameOver = true;
             renderGame();
-            showOverlay('Game Over', 'You ran out of lives!');
+            showResult('Game Over', 'You ran out of lives!', false);
             return;
           }
         }
@@ -519,16 +561,18 @@
         }
       }
       gameOver = true;
-      showOverlay('🎉 You Win!', 'You solved the puzzle!');
+      showResult('🎉 You Win!', 'You solved the puzzle!', true);
     }
 
-    // === Overlay ===
-    function showOverlay(title, msg) {
-      overlayTitle.textContent = title;
-      overlayMsg.textContent = msg;
-      overlay.classList.add('show');
+    // === Result Banner (inline) ===
+    function showResult(title, msg, isWin) {
+      resultTitle.textContent = title;
+      resultMsg.textContent = msg;
+      resultBanner.className = 'show ' + (isWin ? 'win' : 'lose');
     }
-    function hideOverlay() { overlay.classList.remove('show'); }
+    function hideResult() {
+      resultBanner.className = '';
+    }
 
     // === Game Flow ===
     function startGame() {
@@ -536,58 +580,38 @@
       marks = Array.from({ length: board.size }, () => Array(board.size).fill(null));
       lives = 3;
       gameOver = false;
+      activeTool = 'circle';
+      // Reset toolbar selection
+      document.querySelectorAll('.tool-btn').forEach(b => {
+        b.classList.toggle('active-tool', b.dataset.tool === 'circle');
+      });
       menuEl.style.display = 'none';
       gameEl.style.display = 'block';
-      hideOverlay();
-      setupCellEvents();
+      hideResult();
       renderGame();
-    }
-
-    function setupCellEvents() {
-      // We override handleCellClick to support both actions
-      gridTable.removeEventListener('click', gridClickHandler);
-      gridTable.removeEventListener('contextmenu', gridContextHandler);
-      gridTable.addEventListener('click', gridClickHandler);
-      gridTable.addEventListener('contextmenu', gridContextHandler);
-    }
-
-    function gridClickHandler(e) {
-      const td = e.target.closest('.cell');
-      if (!td) return;
-      const r = parseInt(td.dataset.row), c = parseInt(td.dataset.col);
-      if (prefs.mode === 'zen') {
-        handleCellAction(r, c, 'cycle');
-      } else {
-        handleCellAction(r, c, 'circle');
-      }
-    }
-
-    function gridContextHandler(e) {
-      e.preventDefault();
-      const td = e.target.closest('.cell');
-      if (!td) return;
-      const r = parseInt(td.dataset.row), c = parseInt(td.dataset.col);
-      if (prefs.mode === 'zen') {
-        handleCellAction(r, c, 'strike');
-      } else {
-        handleCellAction(r, c, 'strike');
-      }
     }
 
     function goToMenu() {
       gameEl.style.display = 'none';
       menuEl.style.display = 'block';
-      hideOverlay();
+      hideResult();
     }
 
     // === Event Listeners ===
+    gridTable.addEventListener('click', (e) => {
+      const td = e.target.closest('.cell');
+      if (!td) return;
+      handleCellAction(parseInt(td.dataset.row), parseInt(td.dataset.col));
+    });
+
     document.getElementById('start-btn').addEventListener('click', startGame);
     document.getElementById('back-btn').addEventListener('click', goToMenu);
-    document.getElementById('overlay-again').addEventListener('click', startGame);
-    document.getElementById('overlay-menu').addEventListener('click', goToMenu);
+    document.getElementById('result-again').addEventListener('click', startGame);
+    document.getElementById('result-menu').addEventListener('click', goToMenu);
 
     // Init
     setupMenu();
+    setupToolbar();
   </script>
 </body>
 </html>
