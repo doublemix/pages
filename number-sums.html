@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Number Sums</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      color: #e0e0e0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    /* Menu Styles */
+    #menu {
+      background: rgba(255,255,255,0.05);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 1rem;
+      padding: 2.5rem;
+      max-width: 420px;
+      width: 100%;
+      text-align: center;
+    }
+    #menu h1 {
+      font-size: 2.2rem;
+      margin-bottom: 0.5rem;
+      background: linear-gradient(90deg, #e94560, #f5a623);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    #menu p.subtitle { color: #aaa; margin-bottom: 1.5rem; }
+    .menu-section { margin-bottom: 1.2rem; text-align: left; }
+    .menu-section label { display: block; font-size: 0.85rem; color: #bbb; margin-bottom: 0.4rem; }
+    .btn-group { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+    .btn-group button, .btn-start {
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.05);
+      color: #e0e0e0;
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 0.9rem;
+    }
+    .btn-group button:hover, .btn-start:hover { background: rgba(255,255,255,0.15); }
+    .btn-group button.active { background: #e94560; border-color: #e94560; color: #fff; }
+    .btn-start {
+      width: 100%; margin-top: 1.5rem; padding: 0.8rem;
+      font-size: 1.1rem; font-weight: 600;
+      background: linear-gradient(90deg, #e94560, #f5a623);
+      border: none; color: #fff; border-radius: 0.6rem;
+    }
+    .btn-start:hover { opacity: 0.9; transform: scale(1.02); }
+
+    /* Game Styles */
+    #game { display: none; width: 100%; max-width: 600px; text-align: center; }
+    #game-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 1rem; padding: 0 0.5rem;
+    }
+    #game-header h2 { font-size: 1.3rem; }
+    #lives-display { font-size: 1.1rem; color: #e94560; }
+    #back-btn {
+      background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+      color: #e0e0e0; padding: 0.4rem 0.8rem; border-radius: 0.4rem; cursor: pointer;
+      font-size: 0.85rem;
+    }
+    #back-btn:hover { background: rgba(255,255,255,0.2); }
+
+    /* Grid */
+    #grid-container {
+      display: inline-block;
+      background: rgba(0,0,0,0.3);
+      border-radius: 0.6rem;
+      padding: 0.3rem;
+      position: relative;
+    }
+    .grid-table { border-collapse: collapse; }
+    .grid-table td {
+      width: 3rem; height: 3rem;
+      text-align: center; vertical-align: middle;
+      font-size: 1.1rem; font-weight: 600;
+      position: relative;
+      user-select: none;
+    }
+    .cell {
+      cursor: pointer;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 0.3rem;
+      transition: all 0.15s;
+    }
+    .cell:hover { background: rgba(255,255,255,0.12); }
+    .cell.circled {
+      background: rgba(46, 204, 113, 0.25);
+      border-color: #2ecc71;
+      color: #2ecc71;
+      box-shadow: inset 0 0 8px rgba(46,204,113,0.3);
+    }
+    .cell.struck {
+      background: rgba(255,255,255,0.02);
+      color: #555;
+      text-decoration: line-through;
+      border-color: rgba(255,255,255,0.05);
+    }
+    .sum-cell {
+      font-weight: 700;
+      color: #f5a623;
+      background: rgba(245,166,35,0.08);
+      border: none;
+    }
+    .sum-cell.satisfied { color: #2ecc71; background: rgba(46,204,113,0.08); }
+    .corner-cell { border: none; }
+
+    /* Regions */
+    .region-border-top { border-top: 2px solid #f5a623 !important; }
+    .region-border-bottom { border-bottom: 2px solid #f5a623 !important; }
+    .region-border-left { border-left: 2px solid #f5a623 !important; }
+    .region-border-right { border-right: 2px solid #f5a623 !important; }
+    .region-sum {
+      position: absolute; top: 2px; left: 3px;
+      font-size: 0.55rem; color: #f5a623; font-weight: 400;
+      pointer-events: none;
+    }
+
+    /* Win/Lose overlay */
+    #overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+      z-index: 100; align-items: center; justify-content: center;
+    }
+    #overlay.show { display: flex; }
+    #overlay-content {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 1rem; padding: 2rem 3rem; text-align: center;
+    }
+    #overlay-content h2 { font-size: 2rem; margin-bottom: 0.5rem; }
+    #overlay-content p { color: #aaa; margin-bottom: 1.5rem; }
+    #overlay-content button {
+      background: linear-gradient(90deg, #e94560, #f5a623);
+      border: none; color: #fff; padding: 0.7rem 1.5rem;
+      border-radius: 0.5rem; cursor: pointer; font-size: 1rem; font-weight: 600;
+      margin: 0 0.3rem;
+    }
+
+    /* Responsive */
+    @media (max-width: 500px) {
+      .grid-table td { width: 2.3rem; height: 2.3rem; font-size: 0.85rem; }
+      #menu { padding: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <!-- MENU -->
+  <div id="menu">
+    <h1>Number Sums</h1>
+    <p class="subtitle">Circle the numbers that add up to the target sums!</p>
+
+    <div class="menu-section">
+      <label>Grid Size</label>
+      <div class="btn-group" id="size-group">
+        <button data-val="4">4×4</button>
+        <button data-val="5">5×5</button>
+        <button data-val="6">6×6</button>
+        <button data-val="7">7×7</button>
+      </div>
+    </div>
+
+    <div class="menu-section">
+      <label>Mode</label>
+      <div class="btn-group" id="mode-group">
+        <button data-val="zen">Zen</button>
+        <button data-val="challenge">Challenge</button>
+      </div>
+    </div>
+
+    <div class="menu-section">
+      <label>Regions</label>
+      <div class="btn-group" id="regions-group">
+        <button data-val="off">Off</button>
+        <button data-val="on">On</button>
+      </div>
+    </div>
+
+    <button class="btn-start" id="start-btn">Start Game</button>
+  </div>
+
+  <!-- GAME -->
+  <div id="game">
+    <div id="game-header">
+      <button id="back-btn">← Menu</button>
+      <h2>Number Sums</h2>
+      <span id="lives-display"></span>
+    </div>
+    <div id="grid-container">
+      <table class="grid-table" id="grid-table"></table>
+    </div>
+  </div>
+
+  <!-- OVERLAY -->
+  <div id="overlay">
+    <div id="overlay-content">
+      <h2 id="overlay-title"></h2>
+      <p id="overlay-msg"></p>
+      <button id="overlay-again">Play Again</button>
+      <button id="overlay-menu">Menu</button>
+    </div>
+  </div>
+
+  <script>
+    // === Cookie Helpers ===
+    function setCookie(name, value, days) {
+      const d = new Date();
+      d.setTime(d.getTime() + days * 24 * 60 * 60 * 1000);
+      document.cookie = `${name}=${encodeURIComponent(JSON.stringify(value))};expires=${d.toUTCString()};path=/;SameSite=Lax`;
+    }
+    function getCookie(name) {
+      const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+      if (match) try { return JSON.parse(decodeURIComponent(match[2])); } catch(e) {}
+      return null;
+    }
+
+    // === State ===
+    let prefs = getCookie('numSumsPrefs') || { size: 5, mode: 'zen', regions: 'off' };
+    let board = null; // { grid, solution, rowSums, colSums, regions, regionSums }
+    let marks = null; // 2D array: null, 'circled', 'struck'
+    let lives = 3;
+    let gameOver = false;
+
+    // === DOM ===
+    const menuEl = document.getElementById('menu');
+    const gameEl = document.getElementById('game');
+    const gridTable = document.getElementById('grid-table');
+    const livesDisplay = document.getElementById('lives-display');
+    const overlay = document.getElementById('overlay');
+    const overlayTitle = document.getElementById('overlay-title');
+    const overlayMsg = document.getElementById('overlay-msg');
+
+    // === Menu Setup ===
+    function setupMenu() {
+      setupGroup('size-group', 'size', v => parseInt(v));
+      setupGroup('mode-group', 'mode');
+      setupGroup('regions-group', 'regions');
+    }
+    function setupGroup(groupId, prefKey, transform) {
+      const btns = document.querySelectorAll(`#${groupId} button`);
+      btns.forEach(btn => {
+        const val = transform ? transform(btn.dataset.val) : btn.dataset.val;
+        if (prefs[prefKey] === val) btn.classList.add('active');
+        btn.addEventListener('click', () => {
+          btns.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          prefs[prefKey] = val;
+          setCookie('numSumsPrefs', prefs, 7);
+        });
+      });
+    }
+
+    // === Board Generation ===
+    function generateBoard(size, useRegions) {
+      // Generate solution mask (~50% true)
+      const solution = [];
+      const targetCount = Math.round(size * size * 0.5);
+      const indices = [];
+      for (let i = 0; i < size * size; i++) indices.push(i);
+      shuffle(indices);
+      const solutionSet = new Set(indices.slice(0, targetCount));
+      for (let r = 0; r < size; r++) {
+        solution.push([]);
+        for (let c = 0; c < size; c++) {
+          solution[r].push(solutionSet.has(r * size + c));
+        }
+      }
+
+      // Generate grid numbers (1-9)
+      const grid = [];
+      for (let r = 0; r < size; r++) {
+        grid.push([]);
+        for (let c = 0; c < size; c++) {
+          grid[r].push(randInt(1, 9));
+        }
+      }
+
+      // Compute row and col sums
+      const rowSums = [];
+      const colSums = [];
+      for (let r = 0; r < size; r++) {
+        let s = 0;
+        for (let c = 0; c < size; c++) if (solution[r][c]) s += grid[r][c];
+        rowSums.push(s);
+      }
+      for (let c = 0; c < size; c++) {
+        let s = 0;
+        for (let r = 0; r < size; r++) if (solution[r][c]) s += grid[r][c];
+        colSums.push(s);
+      }
+
+      // Regions
+      let regions = null, regionSums = null;
+      if (useRegions) {
+        regions = generateRegions(size);
+        regionSums = computeRegionSums(grid, solution, regions, size);
+      }
+
+      return { grid, solution, rowSums, colSums, regions, regionSums, size };
+    }
+
+    function generateRegions(size) {
+      const totalCells = size * size;
+      const numRegions = Math.max(3, Math.min(7, Math.floor(totalCells / 4)));
+      const regionMap = Array.from({ length: size }, () => Array(size).fill(-1));
+
+      // Place seeds
+      const cells = [];
+      for (let r = 0; r < size; r++) for (let c = 0; c < size; c++) cells.push([r, c]);
+      shuffle(cells);
+      const seeds = cells.slice(0, numRegions);
+      seeds.forEach(([r, c], i) => regionMap[r][c] = i);
+
+      // Grow regions using BFS-like expansion
+      const queues = seeds.map(s => [s]);
+      let unassigned = totalCells - numRegions;
+      let maxIter = totalCells * 10;
+      while (unassigned > 0 && maxIter-- > 0) {
+        for (let i = 0; i < numRegions && unassigned > 0; i++) {
+          if (queues[i].length === 0) continue;
+          const idx = randInt(0, queues[i].length - 1);
+          const [cr, cc] = queues[i][idx];
+          const neighbors = getNeighbors(cr, cc, size).filter(([nr, nc]) => regionMap[nr][nc] === -1);
+          if (neighbors.length === 0) {
+            queues[i].splice(idx, 1);
+            continue;
+          }
+          const [nr, nc] = neighbors[randInt(0, neighbors.length - 1)];
+          regionMap[nr][nc] = i;
+          queues[i].push([nr, nc]);
+          unassigned--;
+        }
+      }
+
+      // Fill any remaining unassigned cells
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          if (regionMap[r][c] === -1) {
+            const nb = getNeighbors(r, c, size).find(([nr, nc]) => regionMap[nr][nc] !== -1);
+            regionMap[r][c] = nb ? regionMap[nb[0]][nb[1]] : 0;
+          }
+        }
+      }
+      return regionMap;
+    }
+
+    function computeRegionSums(grid, solution, regions, size) {
+      const sums = {};
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          const rid = regions[r][c];
+          if (!sums[rid]) sums[rid] = 0;
+          if (solution[r][c]) sums[rid] += grid[r][c];
+        }
+      }
+      return sums;
+    }
+
+    function getNeighbors(r, c, size) {
+      const n = [];
+      if (r > 0) n.push([r-1, c]);
+      if (r < size-1) n.push([r+1, c]);
+      if (c > 0) n.push([r, c-1]);
+      if (c < size-1) n.push([r, c+1]);
+      return n;
+    }
+
+    function shuffle(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = randInt(0, i);
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+    }
+    function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+    // === Rendering ===
+    function renderGame() {
+      const { size, grid, rowSums, colSums, regions, regionSums } = board;
+      gridTable.innerHTML = '';
+
+      // Find which cell is top-left of each region (for sum label)
+      let regionTopLeft = {};
+      if (regions) {
+        for (let r = 0; r < size; r++) {
+          for (let c = 0; c < size; c++) {
+            const rid = regions[r][c];
+            if (!(rid in regionTopLeft)) regionTopLeft[rid] = [r, c];
+          }
+        }
+      }
+
+      for (let r = 0; r <= size; r++) {
+        const tr = document.createElement('tr');
+        for (let c = 0; c <= size; c++) {
+          const td = document.createElement('td');
+          if (r < size && c < size) {
+            // Game cell
+            td.classList.add('cell');
+            td.dataset.row = r;
+            td.dataset.col = c;
+            td.textContent = grid[r][c];
+
+            // Mark state
+            if (marks[r][c] === 'circled') td.classList.add('circled');
+            else if (marks[r][c] === 'struck') td.classList.add('struck');
+
+            // Region borders
+            if (regions) {
+              const rid = regions[r][c];
+              if (r === 0 || regions[r-1][c] !== rid) td.classList.add('region-border-top');
+              if (r === size-1 || regions[r+1][c] !== rid) td.classList.add('region-border-bottom');
+              if (c === 0 || regions[r][c-1] !== rid) td.classList.add('region-border-left');
+              if (c === size-1 || regions[r][c+1] !== rid) td.classList.add('region-border-right');
+
+              // Region sum label on top-left cell of region
+              if (regionTopLeft[rid] && regionTopLeft[rid][0] === r && regionTopLeft[rid][1] === c) {
+                const span = document.createElement('span');
+                span.classList.add('region-sum');
+                span.textContent = regionSums[rid];
+                td.appendChild(span);
+              }
+            }
+
+            td.addEventListener('click', () => handleCellClick(r, c));
+          } else if (r < size && c === size) {
+            // Row sum
+            td.classList.add('sum-cell');
+            td.textContent = rowSums[r];
+            if (getRowCircledSum(r) === rowSums[r]) td.classList.add('satisfied');
+          } else if (r === size && c < size) {
+            // Col sum
+            td.classList.add('sum-cell');
+            td.textContent = colSums[c];
+            if (getColCircledSum(c) === colSums[c]) td.classList.add('satisfied');
+          } else {
+            td.classList.add('corner-cell');
+          }
+          tr.appendChild(td);
+        }
+        gridTable.appendChild(tr);
+      }
+
+      // Lives
+      if (prefs.mode === 'challenge') {
+        livesDisplay.textContent = '♥'.repeat(lives) + '♡'.repeat(Math.max(0, 3 - lives));
+      } else {
+        livesDisplay.textContent = '';
+      }
+    }
+
+    function getRowCircledSum(r) {
+      let s = 0;
+      for (let c = 0; c < board.size; c++) if (marks[r][c] === 'circled') s += board.grid[r][c];
+      return s;
+    }
+    function getColCircledSum(c) {
+      let s = 0;
+      for (let r = 0; r < board.size; r++) if (marks[r][c] === 'circled') s += board.grid[r][c];
+      return s;
+    }
+
+    // === Interaction ===
+    function handleCellClick(r, c) {
+      if (gameOver) return;
+
+      if (prefs.mode === 'zen') {
+        // Cycle: null -> circled -> struck -> null
+        if (marks[r][c] === null) marks[r][c] = 'circled';
+        else if (marks[r][c] === 'circled') marks[r][c] = 'struck';
+        else marks[r][c] = null;
+      } else {
+        // Challenge mode
+        if (marks[r][c] !== null) return; // Can't change marked cells
+
+        const isInSolution = board.solution[r][c];
+        // Left click cycles: circle attempt or strike attempt
+        // We'll use: click = circle, right-click or shift+click = strike
+        // Actually simpler: click to circle, click again if unmarked to strike
+        // Let's use: first click circles if solution, strikes if not
+        // But user doesn't know - let them choose:
+        // Click = attempt circle, Shift+click or right-click = attempt strike
+        // Actually the problem says "way to circle" and "way to gray out" - use separate actions
+        // We'll handle this via the event - but we only get 'click' here
+        // Let's use: click = circle, contextmenu = strike
+        // We'll set this up differently - pass the intended action
+      }
+      renderGame();
+      checkWin();
+    }
+
+    function handleCellAction(r, c, action) {
+      if (gameOver) return;
+      if (prefs.mode === 'zen') {
+        if (action === 'circle') {
+          marks[r][c] = marks[r][c] === 'circled' ? null : 'circled';
+        } else {
+          marks[r][c] = marks[r][c] === 'struck' ? null : 'struck';
+        }
+      } else {
+        // Challenge mode
+        if (marks[r][c] !== null) return;
+        const isInSolution = board.solution[r][c];
+        const correct = (action === 'circle' && isInSolution) || (action === 'strike' && !isInSolution);
+        if (correct) {
+          marks[r][c] = action === 'circle' ? 'circled' : 'struck';
+        } else {
+          lives--;
+          // Auto-correct
+          marks[r][c] = isInSolution ? 'circled' : 'struck';
+          if (lives <= 0) {
+            gameOver = true;
+            renderGame();
+            showOverlay('Game Over', 'You ran out of lives!');
+            return;
+          }
+        }
+      }
+      renderGame();
+      checkWin();
+    }
+
+    function checkWin() {
+      const { size, solution } = board;
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          if (solution[r][c] && marks[r][c] !== 'circled') return;
+          if (!solution[r][c] && marks[r][c] !== 'struck') return;
+        }
+      }
+      gameOver = true;
+      showOverlay('🎉 You Win!', 'You solved the puzzle!');
+    }
+
+    // === Overlay ===
+    function showOverlay(title, msg) {
+      overlayTitle.textContent = title;
+      overlayMsg.textContent = msg;
+      overlay.classList.add('show');
+    }
+    function hideOverlay() { overlay.classList.remove('show'); }
+
+    // === Game Flow ===
+    function startGame() {
+      board = generateBoard(prefs.size, prefs.regions === 'on');
+      marks = Array.from({ length: board.size }, () => Array(board.size).fill(null));
+      lives = 3;
+      gameOver = false;
+      menuEl.style.display = 'none';
+      gameEl.style.display = 'block';
+      hideOverlay();
+      setupCellEvents();
+      renderGame();
+    }
+
+    function setupCellEvents() {
+      // We override handleCellClick to support both actions
+      gridTable.removeEventListener('click', gridClickHandler);
+      gridTable.removeEventListener('contextmenu', gridContextHandler);
+      gridTable.addEventListener('click', gridClickHandler);
+      gridTable.addEventListener('contextmenu', gridContextHandler);
+    }
+
+    function gridClickHandler(e) {
+      const td = e.target.closest('.cell');
+      if (!td) return;
+      const r = parseInt(td.dataset.row), c = parseInt(td.dataset.col);
+      if (prefs.mode === 'zen') {
+        // Click cycles: null -> circled -> struck -> null
+        if (marks[r][c] === null) marks[r][c] = 'circled';
+        else if (marks[r][c] === 'circled') marks[r][c] = 'struck';
+        else marks[r][c] = null;
+        renderGame();
+        checkWin();
+      } else {
+        handleCellAction(r, c, 'circle');
+      }
+    }
+
+    function gridContextHandler(e) {
+      e.preventDefault();
+      const td = e.target.closest('.cell');
+      if (!td) return;
+      const r = parseInt(td.dataset.row), c = parseInt(td.dataset.col);
+      if (prefs.mode === 'zen') {
+        // Right click: toggle struck
+        if (marks[r][c] === 'struck') marks[r][c] = null;
+        else marks[r][c] = 'struck';
+        renderGame();
+        checkWin();
+      } else {
+        handleCellAction(r, c, 'strike');
+      }
+    }
+
+    function goToMenu() {
+      gameEl.style.display = 'none';
+      menuEl.style.display = 'block';
+      hideOverlay();
+    }
+
+    // === Event Listeners ===
+    document.getElementById('start-btn').addEventListener('click', startGame);
+    document.getElementById('back-btn').addEventListener('click', goToMenu);
+    document.getElementById('overlay-again').addEventListener('click', startGame);
+    document.getElementById('overlay-menu').addEventListener('click', goToMenu);
+
+    // Init
+    setupMenu();
+  </script>
+</body>
+</html>
