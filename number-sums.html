@@ -475,40 +475,16 @@
     }
 
     // === Interaction ===
-    function handleCellClick(r, c) {
-      if (gameOver) return;
-
-      if (prefs.mode === 'zen') {
-        // Cycle: null -> circled -> struck -> null
-        if (marks[r][c] === null) marks[r][c] = 'circled';
-        else if (marks[r][c] === 'circled') marks[r][c] = 'struck';
-        else marks[r][c] = null;
-      } else {
-        // Challenge mode
-        if (marks[r][c] !== null) return; // Can't change marked cells
-
-        const isInSolution = board.solution[r][c];
-        // Left click cycles: circle attempt or strike attempt
-        // We'll use: click = circle, right-click or shift+click = strike
-        // Actually simpler: click to circle, click again if unmarked to strike
-        // Let's use: first click circles if solution, strikes if not
-        // But user doesn't know - let them choose:
-        // Click = attempt circle, Shift+click or right-click = attempt strike
-        // Actually the problem says "way to circle" and "way to gray out" - use separate actions
-        // We'll handle this via the event - but we only get 'click' here
-        // Let's use: click = circle, contextmenu = strike
-        // We'll set this up differently - pass the intended action
-      }
-      renderGame();
-      checkWin();
-    }
-
     function handleCellAction(r, c, action) {
       if (gameOver) return;
       if (prefs.mode === 'zen') {
-        if (action === 'circle') {
-          marks[r][c] = marks[r][c] === 'circled' ? null : 'circled';
-        } else {
+        // Cycle: null -> circled -> struck -> null (left click)
+        // Right click directly toggles struck
+        if (action === 'cycle') {
+          if (marks[r][c] === null) marks[r][c] = 'circled';
+          else if (marks[r][c] === 'circled') marks[r][c] = 'struck';
+          else marks[r][c] = null;
+        } else if (action === 'strike') {
           marks[r][c] = marks[r][c] === 'struck' ? null : 'struck';
         }
       } else {
@@ -580,12 +556,7 @@
       if (!td) return;
       const r = parseInt(td.dataset.row), c = parseInt(td.dataset.col);
       if (prefs.mode === 'zen') {
-        // Click cycles: null -> circled -> struck -> null
-        if (marks[r][c] === null) marks[r][c] = 'circled';
-        else if (marks[r][c] === 'circled') marks[r][c] = 'struck';
-        else marks[r][c] = null;
-        renderGame();
-        checkWin();
+        handleCellAction(r, c, 'cycle');
       } else {
         handleCellAction(r, c, 'circle');
       }
@@ -597,11 +568,7 @@
       if (!td) return;
       const r = parseInt(td.dataset.row), c = parseInt(td.dataset.col);
       if (prefs.mode === 'zen') {
-        // Right click: toggle struck
-        if (marks[r][c] === 'struck') marks[r][c] = null;
-        else marks[r][c] = 'struck';
-        renderGame();
-        checkWin();
+        handleCellAction(r, c, 'strike');
       } else {
         handleCellAction(r, c, 'strike');
       }
