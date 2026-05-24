@@ -167,8 +167,9 @@
       font-size: 0.55rem; font-weight: 400;
       position: absolute; bottom: 2px; left: 3px; right: 3px;
     }
-    .sum-cell .sum-circled { color: #2ecc71; }
-    .sum-cell .sum-remaining { color: #888; }
+    .sum-cell .sum-circled, .sum-cell .sum-remaining { color: #888; }
+    .sum-cell .sum-circled.hit, .sum-cell .sum-remaining.hit { color: #2ecc71; }
+    .sum-cell .sum-circled.over, .sum-cell .sum-remaining.over { color: #e94560; }
     .sum-cell.satisfied { color: #2ecc71; background: rgba(46,204,113,0.08); }
     .sum-cell.over { color: #e94560; background: rgba(233,69,96,0.08); }
     .corner-cell { border: none; }
@@ -189,8 +190,9 @@
       font-size: 0.5rem; font-weight: 400;
       pointer-events: none;
     }
-    .region-indicators .sum-circled { color: #2ecc71; }
-    .region-indicators .sum-remaining { color: #888; }
+    .region-indicators .sum-circled, .region-indicators .sum-remaining { color: #888; }
+    .region-indicators .sum-circled.hit, .region-indicators .sum-remaining.hit { color: #2ecc71; }
+    .region-indicators .sum-circled.over, .region-indicators .sum-remaining.over { color: #e94560; }
 
 
 
@@ -492,9 +494,12 @@
                 // Region indicators
                 const regionCircled = getRegionCircledSum(rid);
                 const regionRemaining = getRegionRemainingSum(rid);
+                const rTarget = regionSums[rid];
+                const rCircledClass = regionCircled === rTarget ? 'hit' : regionCircled > rTarget ? 'over' : '';
+                const rRemainingClass = regionRemaining === rTarget ? 'hit' : regionRemaining < rTarget ? 'over' : '';
                 const indSpan = document.createElement('span');
                 indSpan.classList.add('region-indicators');
-                indSpan.innerHTML = `<span class="sum-circled">${regionCircled}</span><span class="sum-remaining">${regionRemaining}</span>`;
+                indSpan.innerHTML = `<span class="sum-circled ${rCircledClass}">${regionCircled}</span><span class="sum-remaining ${rRemainingClass}">${regionRemaining}</span>`;
                 td.appendChild(indSpan);
               }
             }
@@ -502,18 +507,24 @@
             // Row sum cell with indicators
             const currentSum = getRowCircledSum(r);
             const remainingSum = getRowRemainingSum(r);
+            const target = rowSums[r];
+            const circledClass = currentSum === target ? 'hit' : currentSum > target ? 'over' : '';
+            const remainingClass = remainingSum === target ? 'hit' : remainingSum < target ? 'over' : '';
             td.classList.add('sum-cell');
-            td.innerHTML = `${rowSums[r]}<span class="sum-indicators"><span class="sum-circled">${currentSum}</span><span class="sum-remaining">${remainingSum}</span></span>`;
-            if (currentSum === rowSums[r]) td.classList.add('satisfied');
-            else if (currentSum > rowSums[r]) td.classList.add('over');
+            td.innerHTML = `${target}<span class="sum-indicators"><span class="sum-circled ${circledClass}">${currentSum}</span><span class="sum-remaining ${remainingClass}">${remainingSum}</span></span>`;
+            if (currentSum === target) td.classList.add('satisfied');
+            else if (currentSum > target) td.classList.add('over');
           } else if (r === size && c < size) {
             // Col sum cell with indicators
             const currentSum = getColCircledSum(c);
             const remainingSum = getColRemainingSum(c);
+            const target = colSums[c];
+            const circledClass = currentSum === target ? 'hit' : currentSum > target ? 'over' : '';
+            const remainingClass = remainingSum === target ? 'hit' : remainingSum < target ? 'over' : '';
             td.classList.add('sum-cell');
-            td.innerHTML = `${colSums[c]}<span class="sum-indicators"><span class="sum-circled">${currentSum}</span><span class="sum-remaining">${remainingSum}</span></span>`;
-            if (currentSum === colSums[c]) td.classList.add('satisfied');
-            else if (currentSum > colSums[c]) td.classList.add('over');
+            td.innerHTML = `${target}<span class="sum-indicators"><span class="sum-circled ${circledClass}">${currentSum}</span><span class="sum-remaining ${remainingClass}">${remainingSum}</span></span>`;
+            if (currentSum === target) td.classList.add('satisfied');
+            else if (currentSum > target) td.classList.add('over');
           } else {
             td.classList.add('corner-cell');
           }
