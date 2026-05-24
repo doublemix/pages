@@ -72,6 +72,10 @@
       margin-bottom: 0.5rem;
     }
     #lives-display svg { width: 1.4rem; height: 1.4rem; }
+    #timer-display {
+      font-size: 1.1rem; color: #aaa; margin-bottom: 0.5rem;
+      font-variant-numeric: tabular-nums;
+    }
     #back-btn {
       position: absolute; top: 0; left: 0;
       background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
@@ -262,6 +266,7 @@
       <h2>Number Sums</h2>
     </div>
     <div id="lives-display"></div>
+    <div id="timer-display">0:00</div>
     <div id="grid-container">
       <table class="grid-table" id="grid-table"></table>
     </div>
@@ -306,6 +311,8 @@
     let lives = 3;
     let gameOver = false;
     let activeTool = 'circle'; // 'circle', 'strike', 'erase'
+    let timerInterval = null;
+    let timerSeconds = 0;
 
     // === DOM ===
     const menuEl = document.getElementById('menu');
@@ -315,6 +322,26 @@
     const resultBanner = document.getElementById('result-banner');
     const resultTitle = document.getElementById('result-title');
     const resultMsg = document.getElementById('result-msg');
+    const timerDisplay = document.getElementById('timer-display');
+
+    // === Timer ===
+    function startTimer() {
+      stopTimer();
+      timerSeconds = 0;
+      updateTimerDisplay();
+      timerInterval = setInterval(() => {
+        timerSeconds++;
+        updateTimerDisplay();
+      }, 1000);
+    }
+    function stopTimer() {
+      if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    }
+    function updateTimerDisplay() {
+      const m = Math.floor(timerSeconds / 60);
+      const s = timerSeconds % 60;
+      timerDisplay.textContent = `${m}:${s.toString().padStart(2, '0')}`;
+    }
 
     // === Menu Setup ===
     function setupMenu() {
@@ -630,6 +657,7 @@
           marks[r][c] = isInSolution ? 'circled' : 'struck';
           if (lives <= 0) {
             gameOver = true;
+            stopTimer();
             renderGame();
             showResult('Game Over', 'You ran out of lives!', false);
             return;
@@ -649,6 +677,8 @@
         }
       }
       gameOver = true;
+      stopTimer();
+      renderGame();
       showResult('🎉 You Win!', 'You solved the puzzle!', true);
     }
 
@@ -680,12 +710,14 @@
       menuEl.style.display = 'none';
       gameEl.style.display = 'block';
       hideResult();
+      startTimer();
       renderGame();
     }
 
     function goToMenu() {
       gameEl.style.display = 'none';
       menuEl.style.display = 'block';
+      stopTimer();
       hideResult();
     }
 
