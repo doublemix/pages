@@ -1,0 +1,697 @@
+<html>
+<head>
+<title>9-square</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<style>
+  body {
+    margin: 0;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  table {
+    cell-spacing: 0;
+    border-collapse: collapse;
+    border-spacing: 0;
+    margin: 0;
+    padding: 0;
+  }
+  td {
+    margin: 0;
+    padding: 0;
+  }
+</style>
+<script src="https://unpkg.com/vue@3"></script>
+<script>
+Array.prototype.remove = function (el) {
+  const index = this.indexOf(el)
+  if (index >= 0) {
+    this.splice(index, 1)
+  }
+}
+Array.prototype.count = function (predicate = () => true) {
+  return this.reduce((result, item, index) => {
+    if (predicate(item, index, this)) { return result + 1 }
+    else { return result }
+  }, 0)
+}
+Object.defineProperties(Array.prototype, {
+  last: {
+    get () {
+      return this[this.length - 1]
+    },
+    set (newValue) {
+      if (this.length <= 0) throw new Error('cannot overwrite last value of empty array')
+      this[this.length - 1] = newValue
+    }
+  }
+})
+{
+(() => {
+  function addCurrentAccesor (proto) {
+    const descriptor = Object.getOwnPropertyDescriptor(proto, 'value')
+    Object.defineProperties(proto, {
+      current: {
+        configurable: true,
+        enumerable: false,
+        get: descriptor.get,
+        set: descriptor.set,
+      }
+    })
+  }
+  addCurrentAccesor(Vue.ref().__proto__)
+  addCurrentAccesor(Vue.computed(() => {}).__proto__)
+  addCurrentAccesor(Vue.toRefs(Vue.reactive({ x: 0 })).x.__proto__)
+})()}
+
+function pipe(init, ...fs) {
+  return fs.reduce((curr, f) => f(curr), init)
+}
+pipe.it = Symbol('pipe.it')
+pipe.bound = (f, ...args) => {
+  return it => {
+    const realArgs = args.map(x => x === pipe.it ? it : x)
+    return f(...realArgs)
+  }
+}
+const pipeWrap = f => (...args) => x => f(x, ...args)
+pipe.map = pipeWrap(map)
+
+function *range (...args) {
+  let lo = 0, hi, step = 1
+  if (args.length === 1) {
+    [hi] = args
+  } else {
+    [lo, hi, step = step] = args
+  }
+  let curr = lo
+  while ((hi - curr) / step > 0) {
+    yield curr
+    curr += step
+  }
+}
+function *map (iterable, mapper) {
+  let i = 0
+  for (const x of iterable) {
+    yield mapper(x, i)
+    i++
+  }
+}
+function collect (iterable) {
+  return Array.from(iterable)
+}
+function forEach (iterable, action) {
+  for (const x of iterable) {
+    action(x)
+  }
+}
+function *filter (iterable, filterer) {
+  for (const x of iterable) {
+    if (filterer(x)) {
+      yield x
+    }
+  }
+}
+function *pairs (iterable) {
+  let prev = null
+  let first = true
+  for (const x of iterable) {
+    if (!first) {
+      yield [prev, x]
+    } else {
+      first = false;
+    }
+    prev = x
+  }
+}
+function *enumerate (iterable) {
+  let i = 0
+  for (const x of iterable) {
+    yield [x, i]
+    i++
+  }
+}
+function *groups (iterable, n = 2, every = 1) {
+  const prev = []
+  for (const [x, i] of enumerate(iterable)) {
+    prev.push(x)
+    if (prev.length > n) prev.shift()
+    if (i >= n - 1 && ((i - n + 1) % every == 0)) {
+      yield prev.slice()
+    }
+  }
+}
+function *reverse (array) {
+  for (const i of range(array.length, 0, -1)) {
+    yield array[i - 1]
+  }
+}
+function sum (iterable) {
+  let s = 0
+  for (const x of iterable) {
+    s += x
+  }
+  return s
+}
+function *generateAllPermutations (arr) {
+  if (arr.length == 0) {
+    yield []
+    return
+  }
+
+  for (const i of range(0, arr.length)) {
+    const newArray = arr.filter((x, j) => j != i)
+    for (const sub of generateAllPermutations(newArray)) {
+      yield [arr[i], ...sub]
+    }
+  }
+}
+function maxOf (arr, acc) {
+  let bestScore = null
+  let best = undefined
+  for (const x of arr) {
+    const score = acc(x)
+    if (bestScore === null || score > bestScore) {
+      best = x
+      bestScore = score
+    }
+  }
+  return best
+}
+function randomInt (lo, hi, step = 1) {
+  return Math.floor(Math.random() * (hi - lo) / step) * step + lo
+}
+function randomChoice (items) {
+  const index = randomInt(0, items.length)
+  return items[index]
+}
+function fromPolar (angle, r = 1) {
+  return { x: Math.cos(angle) * r, y: Math.sin(angle) * r }
+}
+function useEventHandler (target, eventType, handler) {
+  Vue.onMounted(() => {
+    target.addEventListener(eventType, handler)
+  })
+  Vue.onBeforeUnmount(() => {
+    target.removeEventListener(eventType, handler)
+  })
+}
+function useComputedStorage (key, initialValue, storage = localStorage, transform = JSON) {
+  let value = storage.getItem(key)
+  if (value == null) {
+    value = initialValue
+  } else {
+    value = transform.parse(value)
+  }
+  const _valueRef = Vue.ref(value)
+  const valueRef = Vue.computed({
+    get: () => _valueRef.value,
+    set: (newValue) => {
+      _valueRef.value = newValue
+      storage.setItem(key, transform.stringify(_valueRef.value))
+    },
+  })
+  useEventHandler(window, 'storage', (event) => {
+    if (event.storageArea === storage && event.key === key) {
+      valueRef.value = transform.parse(event.newValue)
+    }
+  })
+  return valueRef
+}
+function useTimeout (effect, delay, source) {
+  let timeoutId = -1
+  const staleRef = Vue.ref(false)
+  Vue.watch(source, () => {
+    clearTimeout(timeoutId)
+    timeoutId = setTimeout(() => {
+      effect()
+      timeoutId = -1
+      staleRef.value = false
+    }, delay)
+    staleRef.value = true
+  })
+  return { stale: staleRef }
+}
+function createContext(defaultValue) {
+  const hasDefault = arguments.length >= 1
+  const symbol = Symbol()
+  return {
+    provide (value) {
+      Vue.provide(symbol, value)
+    },
+    inject (myDefault) {
+      const passedDefault = arguments.length >= 1
+      return Vue.inject(symbol, passedDefault ? myDefault : hasDefault ? defaultValue : Vue.computed(() => { throw new Error('no default') }))
+    }
+  }
+}
+function listed (array, separator=', ', and=' and ', nothing='', oxford = true) {
+  if (array.length === 0) return `${nothing}`
+  if (array.length === 1) return `${array[0]}`
+  if (array.length === 2) return `${array[0]}${and}${array[1]}`
+  return array.map((x, i) => {
+    return `${i > 0 && (i < array.length - 1 || oxford) ? separator : ''}${i === array.length - 1 ? and : ''}${x}`
+  }).join('')
+}
+</script>
+<script>
+var app = Vue.createApp({})
+</script>
+
+<script>
+const MAX_DELAY = 1000
+const MISS_DELAY = 5000
+const MAX_MISSES = 3
+app.config.globalProperties.$filters = {
+  listed,
+}
+app.config.globalProperties.maxDelay = MAX_DELAY
+
+function not(ref) {
+  return Vue.computed(() => !ref.current)
+}
+
+
+function usePeriodic (effect, _getPeriod, enabledRef, debug) {
+  let timeoutId = null
+
+  const getPeriod = () => {
+    const value = _getPeriod()
+    if (debug) console.log(value)
+    return value
+  }
+
+  function update () {
+    if (enabledRef.current) {
+      timeoutId = setTimeout(() => {
+        effect()
+        update()
+      }, getPeriod())
+    } else {
+      timeoutId = null
+    }
+  }
+
+  update()
+
+  Vue.watch(enabledRef, (isEnabled, wasEnabled) => {
+    if (isEnabled && !wasEnabled && timeoutId === null) {
+      update() // need to restart was disabled
+    }
+    if (wasEnabled && !isEnabled && timeoutId !== null) {
+      clearTimeout(timeoutId)
+      timeoutId = null
+    }
+  })
+
+  Vue.onUnmounted(() => {
+    clearTimeout(timeoutId)
+  })
+}
+
+class DefaultMap extends Map {
+  constructor (defaultComputer, ...args) {
+    super(...args)
+    this.defaultComputer = defaultComputer
+  }
+  get (key) {
+    if (!this.has(key)) {
+      this.set(key, this.defaultComputer(key))
+    }
+    return super.get(key)
+  }
+}
+
+class ListMap extends DefaultMap {
+  constructor (...args) {
+    super(() => [], ...args)
+  }
+}
+
+const { useKeybind } = function () {
+  const registrations = new ListMap()
+  function handler (event) {
+    registrations.get(event.code).forEach(h => {
+      h()
+    })   
+  }
+  document.addEventListener("keydown", handler)
+  function useKeybind (keycode, handler) {
+    function uniqueHandler () {
+      handler()
+    }
+    registrations.get(keycode).push(uniqueHandler)
+    Vue.onUnmounted(() => {
+      registrations.get(keycode).remove(uniqueHandler)
+    })
+  }
+  return { useKeybind }
+}()
+
+const { nowRef } = function () {
+  const nowRef = Vue.ref(performance.now())
+
+  function update () {
+    setTimeout(() => {
+      nowRef.current = performance.now()
+      update()
+    }, 50)
+  }
+
+  update()
+
+  return { nowRef }
+}()
+</script>
+
+<style>
+html {
+  font-family: 'Roboto', sans-serif;
+}
+html, body {
+  min-height: 100vh;
+}
+body {
+  background: #EEE;
+}
+.container {
+  max-width: 720px;
+  margin-left: auto;
+  margin-right: auto;
+  min-height: 100%;
+}
+.full-column {
+  display: flex;
+  flex-flow: column nowrap;
+  height: 100%;
+}
+.mt {
+  padding-top:20px;
+}
+.mb {
+  padding-bottom: 20px;
+}
+.card-array {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(3, 1fr);
+}
+.card {
+  min-height: 210px;
+  background: white;
+  border-radius: 10px;
+  box-shadow: gray 0 2px 3px
+}
+.card--active {
+  background: #EEF;
+}
+.card-overlay {
+  /* background: #889; */
+  border-radius: 10px;
+  border: 1px solid #889;
+}
+
+.position-root {
+  position: relative;
+}
+.position-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+.lost-container {
+  display: flex;
+  flex-flow: column nowrap;
+  justify-content: center;
+  height: 100%;
+  background: #000A;
+}
+.lost-banner {
+  height: 200px;
+  background-color: red;
+  color: white;
+  font-size:  6rem;
+  text-align: center;
+  display: flex;
+  flex-flow: column nowrap;
+  justify-content: center;
+}
+.lost-banner--score {
+  font-size: 3rem;
+}
+.button {background: #DDE;border: 1px outset gray;border-radius: 5px;padding: 4px 10px;font-family: inherit;font-size: 1rem;cursor: pointer;}
+
+.button:hover {
+    background: #AAB;
+}
+
+.button:active {
+    background: #887;
+}
+</style>
+
+<script type="text/html" id="my-card-overlay">
+  <div ref="el" class="card-overlay position-overlay"></div>
+</script>
+<script>
+app.component("my-card-overlay", {
+  template: "#my-card-overlay",
+  setup () {
+    const el = Vue.ref(null)
+    Vue.onMounted(() => {
+      el.current.animate([
+        { top: '50%', left: '50%', bottom: '50%', right: '50%' },
+        { top: '0', left: '0', bottom: '0', right: '0' },
+      ], {
+        duration: MAX_DELAY,
+        iterations: 1, 
+      })
+    })
+    return {
+      el
+    }
+  }
+})
+</script>
+
+<script type="text/html" id="my-card">
+  <div @click="onClick" class="card position-root" :class="classes" @touchstart="handleTouchStart">
+    <template v-for="target of targets" :key="target.id">
+      <my-card-overlay>
+      </my-card-overlay>
+    </template>
+  </div>
+</script>
+<script>
+app.component("my-card", {
+  template: "#my-card",
+  props: {
+    targets: Array,
+  },
+  emits: ["click"],
+  setup (props, { emit }) {
+    const { targets } = Vue.toRefs(props)
+
+    const isActiveTarget = Vue.computed(() => {
+      return targets.current.some(x => true)
+    })
+    const classes = Vue.computed(() => {
+      return {
+        "card--active": isActiveTarget.current,
+      }
+    })
+    const onClick = () => {
+      emit("click")
+    }
+    const handleTouchStart = (event) => {
+        emit("click")
+        if (event.cancelable) event.preventDefault()
+    }
+    return {
+      classes,
+      onClick,
+      handleTouchStart,
+    }
+  }
+})
+</script>
+
+
+<script type="text/html" id="main-app">
+  <div class="container">
+    <div class="full-column mt mb position-root">
+      <div>Score: {{ totalScore }}; High-Score: {{ highScore }}; Mouse-Score: {{ mouseScore }} {{ onlyMouse ? '*' : '' }}</div>
+      <div>
+        Misses: {{ misses }}
+      </div>
+      <div class="card-array">
+        <template v-for="i of cards">
+          <my-card :targets="targetsById.get(i)" @click="clicked(i)" :code="codes[i]"></my-card>
+        </template>
+      </div>
+    </div>
+    <div v-if="hasLost" class="position-overlay" @click="handleLostClicked">
+        <div class="lost-container">
+          <div class="lost-banner">
+            <div class="lost-banner--text">You Lost!</div>
+            <div class="lost-banner--score">Score: {{ totalScore }}</div>
+          </div>
+        </div>
+      </div>
+  </div>
+</script>
+<script>
+app.component("main-app", {
+  template: "#main-app",
+  setup () {
+    const getId = (() => {
+      let currId = 0
+      return () => currId++
+    })()
+    const cards = pipe(9, range, collect)
+
+    const targets = Vue.ref([])
+
+    const totalScore = Vue.ref(0)
+    const hasLost = Vue.ref(false)
+    let lostTime = null
+
+    const misses = Vue.ref(0)
+    const missTimeoutIds = []
+    const onlyMouse = Vue.ref(true);
+
+    const highScore = useComputedStorage('something-ominous', 0)
+    const mouseScore = useComputedStorage('something-outrageous', 0)
+
+    const targetsById = Vue.computed(() => {
+      const map = new Map()
+      cards.forEach(i => {
+        map.set(i, [])
+      })
+      for (const t of targets.current) {
+        map.get(t.index).push(t)
+      }
+      return map
+    })
+
+    const handleLose = () => {
+       hasLost.current = true
+       lostTime = performance.now()
+       if (totalScore.current > highScore.current) highScore.current = totalScore.current
+       if (onlyMouse.current && totalScore.current > mouseScore.current) mouseScore.current = totalScore.current
+    }
+
+    const clicked = i => {
+      if (hasLost.current) return;
+      const now = performance.now()
+      const firstTargetIndex = targets.current.findIndex(x => x.index === i)
+      if (firstTargetIndex >= 0) {
+        const firstTarget = targets.current[firstTargetIndex]
+        const score = firstTarget.when + MAX_DELAY - performance.now()
+        if (score > 0) {
+          totalScore.current += Math.floor(score)
+        }
+         targets.current.splice(firstTargetIndex, 1)
+      } else {
+        misses.current++
+        missTimeoutIds.push(setTimeout(() => {
+          misses.current--
+        }, MISS_DELAY))
+        if (misses.current >= MAX_MISSES) {
+          handleLose()
+        }
+      }
+    }
+
+    const gameStartTime = Vue.ref(performance.now())
+    // const period = () => Math.max((1 - (performance.now() - gameStartTime.current) / 60000) * 3000, 100)
+    const period = () => Math.floor(1000 * Math.pow(Math.E, -(performance.now() - gameStartTime.current) * Math.log(0.33333) / -60000))
+    usePeriodic(function () {
+      if (!hasLost.current) { targets.current.push({ id: getId(), index: randomInt(0, 9), when: performance.now() }) }
+    }, period, not(hasLost))
+
+    Vue.watchEffect(() => {
+      if (!hasLost.current) {
+        const now = nowRef.current
+        const lost = targets.current.some(x => x.when + MAX_DELAY - now < 0)
+        if (lost) {
+          handleLose()
+        }
+      }
+    })
+
+    const reset = () => {
+      gameStartTime.current = performance.now()
+      targets.current = []
+      hasLost.current = false
+      totalScore.current = 0
+      missTimeoutIds.forEach(id => clearTimeout(id))
+      misses.current = 0
+      onlyMouse.current = true
+    }
+
+    const codes = pipe([7, 8, 9, 4, 5, 6, 1, 2, 3], pipe.map(x => `Numpad${x}`), collect)
+
+    for (const [keybind, i] of enumerate(codes)) {
+      useKeybind(keybind, () => {
+        onlyMouse.current = false;
+        clicked(i)
+      })
+    }
+
+    useKeybind("Space", () => {
+      if (hasLost.current)
+        reset()
+    })
+
+    Vue.onMounted(() => { reset() })
+    
+    const LOST_INTERACTIVE_DELAY = 1500
+    const handleLostClicked = () => {
+        if (performance.now() - lostTime > LOST_INTERACTIVE_DELAY) {
+           reset()
+        }
+    }
+
+    return {
+      cards,
+      targetsById,
+      totalScore,
+      clicked,
+      hasLost,
+      reset,
+      highScore,
+      codes,
+      misses,
+      mouseScore,
+      onlyMouse,
+      handleLostClicked,
+    }
+  }
+})
+</script>
+
+<div id="app">
+  <main-app></main-app>
+</div>
+<script>
+window.root = app.mount("#app")
+</script>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Page title</title>
+</head>
+<body>
+    
+</body>
+</html>
