@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Grid Reflex // 9-Square</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+  
+  <!-- Load Vue first to ensure it's fully active before script evaluation -->
+  <script src="https://unpkg.com/vue@3"></script>
+
+  <style>
+    body {
+      margin: 0;
+      background: #0d1117;
+      color: #f0f6fc;
+      overscroll-behavior-y: contain;
+      font-family: 'Outfit', sans-serif;
+    }
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    html, body {
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 540px;
+      margin-left: auto;
+      margin-right: auto;
+      min-height: 100vh;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+    }
+    .full-column {
+      display: flex;
+      flex-flow: column nowrap;
+      justify-content: center;
+      flex-grow: 1;
+    }
+    
+    /* --- Modern Neon Scoreboard --- */
+    .score-board {
+      background: rgba(22, 27, 34, 0.8);
+      border: 1px solid rgba(48, 54, 61, 0.8);
+      backdrop-filter: blur(8px);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 24px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .score-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .main-score-container {
+      display: flex;
+      flex-direction: column;
+    }
+    .label-mini {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #8b949e;
+    }
+    .score-prime {
+      font-size: 2.25rem;
+      font-weight: 800;
+      color: #58a6ff;
+      line-height: 1.1;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      border-top: 1px solid rgba(48, 54, 61, 0.5);
+      padding-top: 12px;
+    }
+    .stat-box {
+      display: flex;
+      flex-direction: column;
+    }
+    .stat-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #c9d1d9;
+    }
+    .stat-val.miss {
+      color: #ff7b72;
+    }
+    .active-tag {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      background: #39d353;
+      border-radius: 50%;
+      margin-left: 4px;
+      box-shadow: 0 0 8px #39d353;
+    }
+
+    /* --- Reflex Grid Space --- */
+    .card-array {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(3, 1fr);
+      width: 100%;
+    }
+    .card {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 14px;
+      cursor: pointer;
+      touch-action: manipulation;
+      position: relative;
+      overflow: hidden; /* Constrains point popups safely inside the tile */
+      /* Transitions removed to make tile state changes instant and non-distracting */
+    }
+    .card--active {
+      background: rgba(88, 166, 255, 0.1);
+      border-color: #58a6ff;
+      box-shadow: inset 0 0 12px rgba(88, 166, 255, 0.2);
+    }
+    
+    /* --- Strike Error Shake Animation --- */
+    @keyframes card-shake-red {
+      0%, 100% { transform: translateX(0); border-color: #30363d; }
+      20%, 60% { transform: translateX(-6px); border-color: #ff7b72; box-shadow: inset 0 0 8px rgba(255,123,114,0.3); }
+      40%, 80% { transform: translateX(6px); border-color: #ff7b72; box-shadow: inset 0 0 8px rgba(255,123,114,0.3); }
+    }
+    .card--shake {
+      animation: card-shake-red 0.35s ease-in-out forwards;
+    }
+
+    .card-overlay {
+      border-radius: 12px;
+      border: 2px solid #58a6ff;
+      box-shadow: 0 0 15px rgba(88, 166, 255, 0.4);
+      pointer-events: none;
+    }
+    .position-root {
+      position: relative;
+    }
+    .position-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+    }
+
+    /* --- Subtle & Fast Score Floaters (Top aligned, 150ms fade-out) --- */
+    @keyframes floater-drift {
+      0% { transform: translate(-50%, 0) scale(0.95); opacity: 0; }
+      20% { transform: translate(-50%, -4px) scale(1); opacity: 0.75; }
+      100% { transform: translate(-50%, -10px) scale(0.95); opacity: 0; }
+    }
+    .score-floater {
+      position: absolute;
+      left: 50%;
+      top: 12px; /* Located subtly at the top of the tile */
+      transform: translateX(-50%);
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: #8b949e; /* Muted gray text color */
+      text-shadow: none; /* No neon glow */
+      pointer-events: none;
+      z-index: 10;
+      animation: floater-drift 0.15s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+    }
+
+    /* --- Interactive Game Menus (Start & Game Over Screens) --- */
+    .menu-overlay {
+      display: flex;
+      flex-flow: column nowrap;
+      justify-content: center;
+      align-items: center;
+      height: 100%;
+      background: rgba(13, 17, 23, 0.92);
+      backdrop-filter: blur(8px);
+      padding: 20px;
+    }
+    .menu-banner {
+      width: 100%;
+      max-width: 440px;
+      background: #161b22;
+      border: 2px solid #30363d;
+      border-radius: 24px;
+      padding: 36px 24px;
+      text-align: center;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+    }
+    
+    /* Lobby Screen Specific */
+    .lobby-banner {
+      border-color: #58a6ff;
+      box-shadow: 0 16px 48px rgba(88, 166, 255, 0.15);
+    }
+    .lobby-title {
+      font-size: 2.75rem;
+      font-weight: 800;
+      color: #58a6ff;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+    .lobby-subtitle {
+      font-size: 0.95rem;
+      color: #8b949e;
+      margin-bottom: 28px;
+    }
+    
+    /* Input Instructions list */
+    .controls-panel {
+      background: rgba(22, 27, 34, 0.6);
+      border: 1px solid rgba(48, 54, 61, 0.5);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 28px;
+      text-align: left;
+    }
+    .controls-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 12px;
+      border-bottom: 1px solid rgba(48, 54, 61, 0.5);
+      padding-bottom: 6px;
+    }
+    .controls-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+      font-size: 0.9rem;
+      color: #c9d1d9;
+    }
+    .controls-row:last-child {
+      margin-bottom: 0;
+    }
+    .key-badge {
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 2px 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: #58a6ff;
+    }
+
+    /* Lost Banner Specific */
+    .lost-banner {
+      border-color: #ff7b72;
+      box-shadow: 0 16px 48px rgba(255, 123, 114, 0.18);
+    }
+    .lost-banner--text {
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: #ff7b72;
+      letter-spacing: -0.02em;
+    }
+    .lost-reason-badge {
+      display: inline-block;
+      background: rgba(255, 123, 114, 0.1);
+      border: 1px solid rgba(255, 123, 114, 0.3);
+      color: #ff7b72;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      font-weight: 700;
+      padding: 4px 14px;
+      border-radius: 20px;
+      margin-top: 10px;
+      margin-bottom: 20px;
+      letter-spacing: 0.08em;
+    }
+    .lost-banner--score {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.5rem;
+      color: #c9d1d9;
+      margin: 10px 0;
+    }
+    
+    /* Record Celebration Badges */
+    .celebrations-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin: 15px 0 24px 0;
+    }
+    .record-badge {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: rgba(242, 199, 68, 0.1);
+      border: 1px solid rgba(242, 199, 68, 0.3);
+      color: #f2c744;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      letter-spacing: 0.02em;
+      animation: pulse 1.5s infinite;
+    }
+    .record-badge.touch-badge {
+      background: rgba(163, 113, 247, 0.1);
+      border-color: rgba(163, 113, 247, 0.3);
+      color: #a371f7;
+    }
+    .record-badge.mouse-badge {
+      background: rgba(57, 211, 83, 0.1);
+      border-color: rgba(57, 211, 83, 0.3);
+      color: #39d353;
+    }
+
+    /* Common Button Formatting */
+    .btn-action {
+      background: #238636;
+      color: #ffffff;
+      border: 1px solid rgba(240, 246, 252, 0.1);
+      border-radius: 12px;
+      padding: 12px 32px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      box-shadow: 0 4px 12px rgba(35, 134, 54, 0.3);
+      transition: background 0.15s, transform 0.1s, opacity 0.15s;
+    }
+    .btn-action:hover {
+      background: #2ea043;
+    }
+    .btn-action:active {
+      transform: scale(0.98);
+    }
+    .btn-action:disabled {
+      background: #21262d !important;
+      color: #8b949e !important;
+      border-color: #30363d !important;
+      cursor: not-allowed !important;
+      box-shadow: none !important;
+      opacity: 0.6;
+      transform: none !important;
+    }
+    
+    .restart-hint {
+      margin-top: 15px;
+      font-size: 0.8rem;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.85; }
+      50% { opacity: 1; }
+    }
+
+    @media (max-width: 400px) {
+      .score-prime { font-size: 1.8rem; }
+      .lobby-title { font-size: 2.2rem; }
+      .lost-banner--text { font-size: 2rem; }
+      .stat-val { font-size: 0.85rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- --- REALTIME CONSOLE OVERLAY FOR PREVIEW DIAGNOSTICS --- -->
+<div id="debug-err-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(20,0,0,0.95); color:#ff6b6b; z-index:999999; padding:20px; font-family:monospace; overflow-y:auto; box-sizing:border-box;">
+  <h3 style="margin-top:0; color:#fff; border-bottom:1px solid #ff6b6b; padding-bottom:10px;">⚠️ JavaScript Execution Error</h3>
+  <p id="debug-err-msg" style="font-weight:bold; font-size:1.1rem; color:#ffd2d2; margin-bottom:10px;"></p>
+  <pre id="debug-err-stack" style="background:#2a0505; padding:15px; border-radius:5px; border:1px solid #5a1010; white-space:pre-wrap; word-break:break-all;"></pre>
+  <button onclick="document.getElementById('debug-err-overlay').style.display='none'" style="background:#ff6b6b; color:#fff; border:none; padding:10px 20px; border-radius:4px; cursor:pointer; font-weight:bold;">Dismiss Overlay</button>
+</div>
+<script>
+  window.addEventListener('error', function(event) {
+    var overlay = document.getElementById('debug-err-overlay');
+    var msg = document.getElementById('debug-err-msg');
+    var stack = document.getElementById('debug-err-stack');
+    if (overlay && msg && stack) {
+      overlay.style.display = 'block';
+      msg.textContent = event.message + ' (at ' + event.filename + ':' + event.lineno + ':' + event.colno + ')';
+      stack.textContent = event.error && event.error.stack ? event.error.stack : 'No stack trace available.';
+    }
+  });
+  window.addEventListener('unhandledrejection', function(event) {
+    var overlay = document.getElementById('debug-err-overlay');
+    var msg = document.getElementById('debug-err-msg');
+    var stack = document.getElementById('debug-err-stack');
+    if (overlay && msg && stack) {
+      overlay.style.display = 'block';
+      msg.textContent = 'Unhandled Promise Rejection: ' + event.reason;
+      stack.textContent = event.reason && event.reason.stack ? event.reason.stack : String(event.reason);
+    }
+  });
+</script>
+
+<div id="app">
+  <main-app></main-app>
+</div>
+
+<script>
+// --- Polyfills and Prototypes ---
+Array.prototype.remove = function (el) {
+  const index = this.indexOf(el)
+  if (index >= 0) {
+    this.splice(index, 1)
+  }
+}
+Array.prototype.count = function (predicate = () => true) {
+  return this.reduce((result, item, index) => {
+    if (predicate(item, index, this)) { return result + 1 }
+    else { return result }
+  }, 0)
+}
+Object.defineProperties(Array.prototype, {
+  last: {
+    get () { return this[this.length - 1] },
+    set (newValue) {
+      if (this.length <= 0) throw new Error('cannot overwrite last value of empty array')
+      this[this.length - 1] = newValue
+    }
+  }
+})
+
+// --- Utility Functions ---
+function pipe(init, ...fs) {
+  return fs.reduce((curr, f) => f(curr), init)
+}
+pipe.it = Symbol('pipe.it')
+pipe.bound = (f, ...args) => {
+  return it => {
+    const realArgs = args.map(x => x === pipe.it ? it : x)
+    return f(...realArgs)
+  }
+}
+const pipeWrap = f => (...args) => x => f(x, ...args)
+pipe.map = pipeWrap(map)
+
+function *range (...args) {
+  let lo = 0, hi, step = 1
+  if (args.length === 1) {
+    [hi] = args
+  } else {
+    [lo, hi, step = step] = args
+  }
+  let curr = lo
+  while ((hi - curr) / step > 0) {
+    yield curr
+    curr += step
+  }
+}
+function *map (iterable, mapper) {
+  let i = 0
+  for (const x of iterable) {
+    yield mapper(x, i)
+    i++
+  }
+}
+function collect (iterable) {
+  return Array.from(iterable)
+}
+function *enumerate (iterable) {
+  let i = 0
+  for (const x of iterable) {
+    yield [x, i]
+    i++
+  }
+}
+function randomInt (lo, hi, step = 1) {
+  return Math.floor(Math.random() * (hi - lo) / step) * step + lo
+}
+function useEventHandler (target, eventType, handler) {
+  Vue.onMounted(() => { target.addEventListener(eventType, handler) })
+  Vue.onBeforeUnmount(() => { target.removeEventListener(eventType, handler) })
+}
+function useComputedStorage (key, initialValue, storage = localStorage, transform = JSON) {
+  let value = storage.getItem(key)
+  if (value == null) {
+    value = initialValue
+  } else {
+    value = transform.parse(value)
+  }
+  const _valueRef = Vue.ref(value)
+  const valueRef = Vue.computed({
+    get: () => _valueRef.value,
+    set: (newValue) => {
+      _valueRef.value = newValue
+      storage.setItem(key, transform.stringify(_valueRef.value))
+    },
+  })
+  useEventHandler(window, 'storage', (event) => {
+    if (event.storageArea === storage && event.key === key) {
+      valueRef.value = transform.parse(event.newValue)
+    }
+  })
+  return valueRef
+}
+
+function not(ref) {
+  return Vue.computed(() => !ref.value)
+}
+
+function usePeriodic (effect, _getPeriod, enabledRef, debug) {
+  let timeoutId = null
+  const getPeriod = () => {
+    const value = _getPeriod()
+    if (debug) console.log(value)
+    return value
+  }
+  function update () {
+    if (enabledRef.value) {
+      timeoutId = setTimeout(() => {
+        effect()
+        update()
+      }, getPeriod())
+    } else {
+      timeoutId = null
+    }
+  }
+  update()
+  Vue.watch(enabledRef, (isEnabled, wasEnabled) => {
+    if (isEnabled && !wasEnabled && timeoutId === null) {
+      update()
+    }
+    if (wasEnabled && !isEnabled && timeoutId !== null) {
+      clearTimeout(timeoutId)
+      timeoutId = null
+    }
+  })
+  Vue.onUnmounted(() => {
+    clearTimeout(timeoutId)
+  })
+}
+
+class DefaultMap extends Map {
+  constructor (defaultComputer, ...args) {
+    super(...args)
+    this.defaultComputer = defaultComputer
+  }
+  get (key) {
+    if (!this.has(key)) {
+      this.set(key, this.defaultComputer(key))
+    }
+    return super.get(key)
+  }
+}
+
+class ListMap extends DefaultMap {
+  constructor (...args) {
+    super(() => [], ...args)
+  }
+}
+
+const { useKeybind } = function () {
+  const registrations = new ListMap()
+  function handler (event) {
+    registrations.get(event.code).forEach(h => { h() })   
+  }
+  document.addEventListener("keydown", handler)
+  function useKeybind (keycode, handler) {
+    function uniqueHandler () { handler() }
+    registrations.get(keycode).push(uniqueHandler)
+    Vue.onUnmounted(() => {
+      registrations.get(keycode).remove(uniqueHandler)
+    })
+  }
+  return { useKeybind }
+}()
+
+const { nowRef } = function () {
+  const nowRef = Vue.ref(performance.now())
+  function update () {
+    setTimeout(() => {
+      nowRef.value = performance.now()
+      update()
+    }, 50)
+  }
+  update()
+  return { nowRef }
+}()
+</script>
+
+<!-- Vue Component Templates -->
+<script type="text/html" id="my-card-overlay">
+  <div ref="el" class="card-overlay position-overlay"></div>
+</script>
+
+<script type="text/html" id="my-card">
+  <div @mousedown="onMouseDown" class="card position-root" :class="classes" @touchstart="handleTouchStart">
+    <!-- Overlay Shrinking Targets -->
+    <template v-for="target of targets" :key="target.id">
+      <my-card-overlay></my-card-overlay>
+    </template>
+    
+    <!-- Localized Muted Points Floating Indicators (Top aligned, 150ms fade-out) -->
+    <div v-for="floater in floaters" :key="floater.id" class="score-floater">
+      {{ floater.text }}
+    </div>
+  </div>
+</script>
+
+<script type="text/html" id="main-app">
+  <div class="container">
+    <div class="full-column position-root">
+      
+      <!-- Modern Interactive Scoreboard Panel -->
+      <div class="score-board">
+        <div class="score-row">
+          <div class="main-score-container">
+            <span class="label-mini">Current Run</span>
+            <span class="score-prime">{{ totalScore }}</span>
+          </div>
+          <div class="main-score-container" style="text-align: right;">
+            <span class="label-mini">All-Time High</span>
+            <span class="score-prime" style="color: #ffd33d;">{{ highScore }}</span>
+          </div>
+        </div>
+        
+        <div class="stats-grid">
+          <div class="stat-box">
+            <span class="label-mini">Mouse Record <span v-if="isPureMouse" class="active-tag"></span></span>
+            <span class="stat-val">{{ mouseScore }}</span>
+          </div>
+          <div class="stat-box">
+            <span class="label-mini">Touch Record <span v-if="isPureTouch" class="active-tag"></span></span>
+            <span class="stat-val" style="color: #a371f7;">{{ touchScore }}</span>
+          </div>
+          <div class="stat-box">
+            <span class="label-mini">Input Track</span>
+            <span class="stat-val">{{ currentInputType }}</span>
+          </div>
+          <div class="stat-box">
+            <span class="label-mini">Fails</span>
+            <span class="stat-val miss">{{ misses }} / 3</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Play Field Grid Layout -->
+      <div class="card-array">
+        <template v-for="i of cards">
+          <my-card 
+            :targets="targetsById.get(i)" 
+            :floaters="scoreFloaters.filter(f => f.cardIndex === i)"
+            :shaking="shakingCards.has(i)"
+            :class="{ 'card--shake': shakingCards.has(i) }"
+            @click-action="clicked(i, $event)" 
+            :code="codes[i]">
+          </my-card>
+        </template>
+      </div>
+    </div>
+
+    <!-- START LOBBY SCREEN -->
+    <div v-if="!isPlaying && !hasLost" class="position-overlay menu-overlay">
+      <div class="menu-banner lobby-banner">
+        <div class="lobby-title">GRID REFLEX</div>
+        <div class="lobby-subtitle">Arcade Reaction & Speed Testing Unit</div>
+        
+        <!-- Controls Setup Guide -->
+        <div class="controls-panel">
+          <div class="controls-title">Configured Input Channels</div>
+          <div class="controls-row">
+            <span class="key-badge">🖱️ Mouse Click</span>
+            <span>Triggers Mouse Track</span>
+          </div>
+          <div class="controls-row">
+            <span class="key-badge">📱 Direct Tap</span>
+            <span>Triggers Touch Track</span>
+          </div>
+          <div class="controls-row">
+            <span class="key-badge">⌨️ Numpad 1-9</span>
+            <span>Triggers Key Track (789, 456, 123)</span>
+          </div>
+        </div>
+
+        <button class="btn-action" @click="startGame">START MISSION</button>
+        <div class="restart-hint">Press Space to Launch</div>
+      </div>
+    </div>
+
+    <!-- LOSS / GAME OVER MODAL -->
+    <div v-if="hasLost" class="position-overlay menu-overlay">
+      <div class="menu-banner lost-banner">
+        <div class="lost-banner--text">Run Ended</div>
+        <div class="lost-reason-badge">{{ detailedLostReason }}</div>
+        
+        <div class="lost-banner--score">Final Score: {{ totalScore }}</div>
+
+        <!-- Dynamic Milestone Celebration Container -->
+        <div class="celebrations-container" v-if="newAllTimeHigh || newMouseHigh || newTouchHigh">
+          <div class="record-badge" v-if="newAllTimeHigh">
+            👑 NEW ALL-TIME HIGH RECORD set!
+          </div>
+          <div class="record-badge mouse-badge" v-if="newMouseHigh">
+            🖱️ NEW MOUSE-ONLY HIGHSCORE set!
+          </div>
+          <div class="record-badge touch-badge" v-if="newTouchHigh">
+            🎯 NEW TOUCH-ONLY HIGHSCORE set!
+          </div>
+        </div>
+
+        <!-- Try Again Safety Delay Button -->
+        <button class="btn-action" :disabled="isResetDisabled" @click="startGame">
+          {{ isResetDisabled ? 'LOCKOUT ACTIVE...' : 'TRY AGAIN' }}
+        </button>
+        <div class="restart-hint" v-if="!isResetDisabled">Press Space to Quick Reset</div>
+        <div class="restart-hint" v-else style="color: #ff7b72; font-weight: bold;">Safety Lockout Engaged</div>
+      </div>
+    </div>
+  </div>
+</script>
+
+<!-- Vue Component Logic Definitions -->
+<script>
+// Instantiate Vue App cleanly (ONLY once in the entire ecosystem)
+const app = Vue.createApp({});
+
+const MAX_DELAY = 1000;
+const MISS_DELAY = 5000;
+const MAX_MISSES = 3;
+
+app.component("my-card-overlay", {
+  template: "#my-card-overlay",
+  setup () {
+    const el = Vue.ref(null);
+    Vue.onMounted(() => {
+      if (el.value && el.value.animate) {
+        el.value.animate([
+          { top: '50%', left: '50%', bottom: '50%', right: '50%', opacity: 1 },
+          { top: '0', left: '0', bottom: '0', right: '0', opacity: 0.25 },
+        ], {
+          duration: MAX_DELAY,
+          iterations: 1, 
+        });
+      }
+    });
+    return { el };
+  }
+});
+
+app.component("my-card", {
+  template: "#my-card",
+  props: {
+    targets: Array,
+    floaters: Array,
+    shaking: Boolean
+  },
+  emits: ["click-action"],
+  setup (props, { emit }) {
+    const { targets } = Vue.toRefs(props);
+    const isActiveTarget = Vue.computed(() => {
+      return targets.value.some(x => true);
+    });
+    const classes = Vue.computed(() => {
+      return { 
+        "card--active": isActiveTarget.value
+      };
+    });
+    const onMouseDown = (event) => {
+      if (event.detail === 0) return; 
+      emit("click-action", "mouse");
+    };
+    const handleTouchStart = (event) => {
+      emit("click-action", "touch");
+      if (event.cancelable) event.preventDefault();
+    };
+    return { classes, onMouseDown, handleTouchStart };
+  }
+});
+
+app.component("main-app", {
+  template: "#main-app",
+  setup () {
+    const getId = (() => {
+      let currId = 0;
+      return () => currId++;
+    })();
+    const cards = pipe(9, range, collect);
+    const targets = Vue.ref([]);
+    const totalScore = Vue.ref(0);
+    
+    // Core game flow controllers
+    const isPlaying = Vue.ref(false);
+    const hasLost = Vue.ref(false);
+    let lostTime = null;
+
+    const misses = Vue.ref(0);
+    const missTimeoutIds = [];
+    
+    // Live feedback animation structures
+    const shakingCards = Vue.ref(new Set());
+    const scoreFloaters = Vue.ref([]);
+
+    // Run failure analytics
+    const detailedLostReason = Vue.ref("");
+    const newAllTimeHigh = Vue.ref(false);
+    const newMouseHigh = Vue.ref(false);
+    const newTouchHigh = Vue.ref(false);
+    const isResetDisabled = Vue.ref(false); // Safety lockout reactive flag
+
+    // Pure input tracking status flags
+    const isPureMouse = Vue.ref(true);
+    const isPureTouch = Vue.ref(true);
+
+    const highScore = useComputedStorage('v2-ominous-all', 0);
+    const mouseScore = useComputedStorage('v2-outrageous-mouse', 0);
+    const touchScore = useComputedStorage('v2-outstanding-touch', 0);
+
+    const currentInputType = Vue.computed(() => {
+      if (!isPlaying.value) return "Stopped";
+      if (!isPureMouse.value && !isPureTouch.value) return "Keyboard / Hybrid";
+      if (isPureTouch.value && !isPureMouse.value) return "Touch Only";
+      if (isPureMouse.value && !isPureTouch.value) return "Mouse Only";
+      return "Ready";
+    });
+
+    const targetsById = Vue.computed(() => {
+      const map = new Map();
+      cards.forEach(i => { map.set(i, []) });
+      for (const t of targets.value) {
+        map.get(t.index).push(t);
+      }
+      return map;
+    });
+
+    const handleLose = (reason) => {
+       isPlaying.value = false;
+       hasLost.value = true;
+       lostTime = performance.now();
+       
+       // Engages safety delay on failure screen restart actions (1.5 seconds)
+       isResetDisabled.value = true;
+       setTimeout(() => {
+         isResetDisabled.value = false;
+       }, 1500);
+       
+       // Concise, punchy arcade loss reasons
+       if (reason === 'strike_limit') {
+         detailedLostReason.value = "STRIKE-OUT";
+       } else {
+         detailedLostReason.value = "OVERLOADED"; // Updated to the requested shorter arcade term
+       }
+
+       // Flag high score completions during this run
+       newAllTimeHigh.value = totalScore.value > highScore.value && totalScore.value > 0;
+       newMouseHigh.value = isPureMouse.value && totalScore.value > mouseScore.value && totalScore.value > 0;
+       newTouchHigh.value = isPureTouch.value && totalScore.value > touchScore.value && totalScore.value > 0;
+
+       // Save metrics to local storage
+       if (newAllTimeHigh.value) highScore.value = totalScore.value;
+       if (newMouseHigh.value) mouseScore.value = totalScore.value;
+       if (newTouchHigh.value) touchScore.value = totalScore.value;
+    };
+
+    const clicked = (i, inputMethod) => {
+      if (!isPlaying.value || hasLost.value) return;
+      
+      // Handle input pure tracking states
+      if (inputMethod === "mouse") {
+        isPureTouch.value = false;
+      } else if (inputMethod === "touch") {
+        isPureMouse.value = false;
+      } else if (inputMethod === "keyboard") {
+        isPureMouse.value = false;
+        isPureTouch.value = false;
+      }
+
+      const now = performance.now();
+      const firstTargetIndex = targets.value.findIndex(x => x.index === i);
+      
+      if (firstTargetIndex >= 0) {
+        // Correct Hit Feedback
+        const firstTarget = targets.value[firstTargetIndex];
+        const rawScore = firstTarget.when + MAX_DELAY - performance.now();
+        const scoreGain = Math.max(0, Math.floor(rawScore));
+        
+        if (scoreGain > 0) {
+          totalScore.value += scoreGain;
+          
+          // Trigger subtle points popup element
+          const floaterId = Date.now() + Math.random();
+          scoreFloaters.value.push({
+            id: floaterId,
+            cardIndex: i,
+            text: `+${scoreGain}`
+          });
+          
+          // Fast clear after exactly 150ms animation ends
+          setTimeout(() => {
+            scoreFloaters.value = scoreFloaters.value.filter(f => f.id !== floaterId);
+          }, 150);
+        }
+        targets.value.splice(firstTargetIndex, 1);
+      } else {
+        // Trigger red shaking card sequence
+        shakingCards.value.add(i);
+        setTimeout(() => {
+          shakingCards.value.delete(i);
+        }, 350);
+
+        misses.value++;
+        missTimeoutIds.push(setTimeout(() => {
+          misses.value--;
+        }, MISS_DELAY));
+        
+        if (misses.value >= MAX_MISSES) {
+          handleLose('strike_limit');
+        }
+      }
+    };
+
+    const gameStartTime = Vue.ref(performance.now());
+    const period = () => Math.floor(1000 * Math.pow(Math.E, -(performance.now() - gameStartTime.value) * Math.log(0.33333) / -60000));
+    
+    // Period controller enabled computed property
+    const isGameActive = Vue.computed(() => {
+      return isPlaying.value && !hasLost.value;
+    });
+
+    usePeriodic(function () {
+      if (isPlaying.value && !hasLost.value) { 
+        targets.value.push({ id: getId(), index: randomInt(0, 9), when: performance.now() }); 
+      }
+    }, period, isGameActive);
+
+    Vue.watchEffect(() => {
+      if (isPlaying.value && !hasLost.value) {
+        const now = nowRef.value;
+        const lost = targets.value.some(x => x.when + MAX_DELAY - now < 0);
+        if (lost) {
+          handleLose('expired');
+        }
+      }
+    });
+
+    const startGame = () => {
+      // Prevent restarts during active lockout window
+      if (isResetDisabled.value) return;
+
+      // Clear game flags
+      newAllTimeHigh.value = false;
+      newMouseHigh.value = false;
+      newTouchHigh.value = false;
+      detailedLostReason.value = "";
+
+      // Initialize gameplay state loops
+      gameStartTime.value = performance.now();
+      targets.value = [];
+      hasLost.value = false;
+      totalScore.value = 0;
+      missTimeoutIds.forEach(id => clearTimeout(id));
+      misses.value = 0;
+      isPureMouse.value = true;
+      isPureTouch.value = true;
+      isPlaying.value = true;
+    };
+
+    // Safely configure and bind key handlers inside setup()
+    const codes = pipe([7, 8, 9, 4, 5, 6, 1, 2, 3], pipe.map(x => `Numpad${x}`), collect);
+
+    for (const [keybind, i] of enumerate(codes)) {
+      useKeybind(keybind, () => {
+        clicked(i, "keyboard");
+      });
+    }
+
+    useKeybind("Space", () => {
+      if (!isPlaying.value || hasLost.value) {
+        startGame();
+      }
+    });
+
+    const handleLostClicked = () => {
+        if (!isResetDisabled.value) {
+           startGame();
+        }
+    };
+
+    return {
+      cards,
+      targetsById,
+      totalScore,
+      clicked,
+      isPlaying,
+      hasLost,
+      startGame,
+      highScore,
+      codes,
+      misses,
+      mouseScore,
+      touchScore,
+      isPureMouse,
+      isPureTouch,
+      currentInputType,
+      handleLostClicked,
+      shakingCards,
+      scoreFloaters,
+      detailedLostReason,
+      newAllTimeHigh,
+      newMouseHigh,
+      newTouchHigh,
+      isResetDisabled
+    }
+  }
+});
+
+// Mount App
+window.root = app.mount("#app");
+</script>
+</body>
+</html>
