@@ -3,43 +3,32 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>9-square</title>
+  <title>Grid Reflex // 9-Square</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
   <style>
     body {
       margin: 0;
-      background: #EEE;
+      background: #0d1117;
+      color: #f0f6fc;
       overscroll-behavior-y: contain;
+      font-family: 'Outfit', sans-serif;
     }
     * {
       box-sizing: border-box;
       -webkit-tap-highlight-color: transparent;
       user-select: none;
     }
-    table {
-      border-collapse: collapse;
-      border-spacing: 0;
-      margin: 0;
-      padding: 0;
-    }
-    td {
-      margin: 0;
-      padding: 0;
-    }
-    html {
-      font-family: 'Roboto', sans-serif;
-    }
     html, body {
       min-height: 100vh;
     }
     .container {
-      max-width: 600px;
+      max-width: 540px;
       margin-left: auto;
       margin-right: auto;
       min-height: 100vh;
-      padding: 15px;
+      padding: 20px;
       display: flex;
       flex-direction: column;
     }
@@ -49,33 +38,99 @@
       justify-content: center;
       flex-grow: 1;
     }
+    
+    /* --- Modern Neon Scoreboard --- */
     .score-board {
-      font-size: 1.1rem;
-      margin-bottom: 15px;
-      text-align: center;
-      line-height: 1.5;
+      background: rgba(22, 27, 34, 0.8);
+      border: 1px solid rgba(48, 54, 61, 0.8);
+      backdrop-filter: blur(8px);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 24px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
     }
+    .score-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .main-score-container {
+      display: flex;
+      flex-direction: column;
+    }
+    .label-mini {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #8b949e;
+    }
+    .score-prime {
+      font-size: 2.25rem;
+      font-weight: 800;
+      color: #58a6ff;
+      line-height: 1.1;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      border-top: 1px solid rgba(48, 54, 61, 0.5);
+      padding-top: 12px;
+    }
+    .stat-box {
+      display: flex;
+      flex-direction: column;
+    }
+    .stat-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #c9d1d9;
+    }
+    .stat-val.miss {
+      color: #ff7b72;
+    }
+    .active-tag {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      background: #39d353;
+      border-radius: 50%;
+      margin-left: 4px;
+      box-shadow: 0 0 8px #39d353;
+    }
+
+    /* --- Reflex Grid Space --- */
     .card-array {
       display: grid;
-      gap: 12px;
+      gap: 14px;
       grid-template-columns: repeat(3, 1fr);
       width: 100%;
     }
     .card {
       width: 100%;
-      aspect-ratio: 1 / 1; /* Guarantees blocks stay mathematically square on all screens */
-      background: white;
-      border-radius: 10px;
-      box-shadow: gray 0 2px 3px;
+      aspect-ratio: 1 / 1;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 14px;
       cursor: pointer;
       touch-action: manipulation;
+      transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
     }
     .card--active {
-      background: #EEF;
+      background: rgba(88, 166, 255, 0.1);
+      border-color: #58a6ff;
+      box-shadow: inset 0 0 12px rgba(88, 166, 255, 0.2);
     }
     .card-overlay {
-      border-radius: 10px;
-      border: 1px solid #889;
+      border-radius: 12px;
+      border: 2px solid #58a6ff;
+      box-shadow: 0 0 15px rgba(88, 166, 255, 0.4);
+      pointer-events: none;
     }
     .position-root {
       position: relative;
@@ -87,31 +142,57 @@
       right: 0;
       bottom: 0;
     }
+
+    /* --- Interactive Game Over Banner --- */
     .lost-container {
       display: flex;
       flex-flow: column nowrap;
       justify-content: center;
+      align-items: center;
       height: 100%;
-      background: #000A;
+      background: rgba(13, 17, 23, 0.9);
+      backdrop-filter: blur(6px);
+      padding: 20px;
     }
     .lost-banner {
-      padding: 40px 20px;
-      background-color: red;
-      color: white;
-      font-size: 4rem;
+      width: 100%;
+      max-width: 400px;
+      background: #21262d;
+      border: 2px solid #ff7b72;
+      border-radius: 24px;
+      padding: 32px 24px;
       text-align: center;
-      display: flex;
-      flex-flow: column nowrap;
-      justify-content: center;
+      box-shadow: 0 16px 48px rgba(255, 123, 114, 0.15);
+    }
+    .lost-banner--text {
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: #ff7b72;
+      letter-spacing: -0.02em;
     }
     .lost-banner--score {
-      font-size: 2rem;
-      margin-top: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.5rem;
+      color: #c9d1d9;
+      margin: 16px 0 24px 0;
     }
+    .restart-hint {
+      font-size: 0.85rem;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.5; }
+      50% { opacity: 1; }
+    }
+
     @media (max-width: 400px) {
-      .lost-banner { font-size: 3rem; }
-      .lost-banner--score { font-size: 1.5rem; }
-      .score-board { font-size: 0.95rem; }
+      .score-prime { font-size: 1.8rem; }
+      .lost-banner--text { font-size: 2rem; }
+      .stat-val { font-size: 0.85rem; }
     }
   </style>
 </head>
@@ -121,6 +202,7 @@
   <main-app></main-app>
 </div>
 
+<!-- Scripts Area -->
 <script src="https://unpkg.com/vue@3"></script>
 
 <script>
@@ -139,9 +221,7 @@ Array.prototype.count = function (predicate = () => true) {
 }
 Object.defineProperties(Array.prototype, {
   last: {
-    get () {
-      return this[this.length - 1]
-    },
+    get () { return this[this.length - 1] },
     set (newValue) {
       if (this.length <= 0) throw new Error('cannot overwrite last value of empty array')
       this[this.length - 1] = newValue
@@ -206,100 +286,12 @@ function *map (iterable, mapper) {
 function collect (iterable) {
   return Array.from(iterable)
 }
-function forEach (iterable, action) {
-  for (const x of iterable) {
-    action(x)
-  }
-}
-function *filter (iterable, filterer) {
-  for (const x of iterable) {
-    if (filterer(x)) {
-      yield x
-    }
-  }
-}
-function *pairs (iterable) {
-  let prev = null
-  let first = true
-  for (const x of iterable) {
-    if (!first) {
-      yield [prev, x]
-    } else {
-      first = false;
-    }
-    prev = x
-  }
-}
-function *enumerate (iterable) {
-  let i = 0
-  for (const x of iterable) {
-    yield [x, i]
-    i++
-  }
-}
-function *groups (iterable, n = 2, every = 1) {
-  const prev = []
-  for (const [x, i] of enumerate(iterable)) {
-    prev.push(x)
-    if (prev.length > n) prev.shift()
-    if (i >= n - 1 && ((i - n + 1) % every == 0)) {
-      yield prev.slice()
-    }
-  }
-}
-function *reverse (array) {
-  for (const i of range(array.length, 0, -1)) {
-    yield array[i - 1]
-  }
-}
-function sum (iterable) {
-  let s = 0
-  for (const x of iterable) {
-    s += x
-  }
-  return s
-}
-function *generateAllPermutations (arr) {
-  if (arr.length == 0) {
-    yield []
-    return
-  }
-  for (const i of range(0, arr.length)) {
-    const newArray = arr.filter((x, j) => j != i)
-    for (const sub of generateAllPermutations(newArray)) {
-      yield [arr[i], ...sub]
-    }
-  }
-}
-function maxOf (arr, acc) {
-  let bestScore = null
-  let best = undefined
-  for (const x of arr) {
-    const score = acc(x)
-    if (bestScore === null || score > bestScore) {
-      best = x
-      bestScore = score
-    }
-  }
-  return best
-}
 function randomInt (lo, hi, step = 1) {
   return Math.floor(Math.random() * (hi - lo) / step) * step + lo
 }
-function randomChoice (items) {
-  const index = randomInt(0, items.length)
-  return items[index]
-}
-function fromPolar (angle, r = 1) {
-  return { x: Math.cos(angle) * r, y: Math.sin(angle) * r }
-}
 function useEventHandler (target, eventType, handler) {
-  Vue.onMounted(() => {
-    target.addEventListener(eventType, handler)
-  })
-  Vue.onBeforeUnmount(() => {
-    target.removeEventListener(eventType, handler)
-  })
+  Vue.onMounted(() => { target.addEventListener(eventType, handler) })
+  Vue.onBeforeUnmount(() => { target.removeEventListener(eventType, handler) })
 }
 function useComputedStorage (key, initialValue, storage = localStorage, transform = JSON) {
   let value = storage.getItem(key)
@@ -323,53 +315,6 @@ function useComputedStorage (key, initialValue, storage = localStorage, transfor
   })
   return valueRef
 }
-function useTimeout (effect, delay, source) {
-  let timeoutId = -1
-  const staleRef = Vue.ref(false)
-  Vue.watch(source, () => {
-    clearTimeout(timeoutId)
-    timeoutId = setTimeout(() => {
-      effect()
-      timeoutId = -1
-      staleRef.value = false
-    }, delay)
-    staleRef.value = true
-  })
-  return { stale: staleRef }
-}
-function createContext(defaultValue) {
-  const hasDefault = arguments.length >= 1
-  const symbol = Symbol()
-  return {
-    provide (value) {
-      Vue.provide(symbol, value)
-    },
-    inject (myDefault) {
-      const passedDefault = arguments.length >= 1
-      return Vue.inject(symbol, passedDefault ? myDefault : hasDefault ? defaultValue : Vue.computed(() => { throw new Error('no default') }))
-    }
-  }
-}
-function listed (array, separator=', ', and=' and ', nothing='', oxford = true) {
-  if (array.length === 0) return `${nothing}`
-  if (array.length === 1) return `${array[0]}`
-  if (array.length === 2) return `${array[0]}${and}${array[1]}`
-  return array.map((x, i) => {
-    return `${i > 0 && (i < array.length - 1 || oxford) ? separator : ''}${i === array.length - 1 ? and : ''}${x}`
-  }).join('')
-}
-</script>
-
-<script>
-// --- Initialization & Global Setup ---
-var app = Vue.createApp({})
-
-const MAX_DELAY = 1000
-const MISS_DELAY = 5000
-const MAX_MISSES = 3
-
-app.config.globalProperties.$filters = { listed }
-app.config.globalProperties.maxDelay = MAX_DELAY
 
 function not(ref) {
   return Vue.computed(() => !ref.current)
@@ -455,12 +400,13 @@ const { nowRef } = function () {
 }()
 </script>
 
+<!-- Vue Component Templates -->
 <script type="text/html" id="my-card-overlay">
   <div ref="el" class="card-overlay position-overlay"></div>
 </script>
 
 <script type="text/html" id="my-card">
-  <div @click="onClick" class="card position-root" :class="classes" @touchstart="handleTouchStart">
+  <div @mousedown="onMouseDown" class="card position-root" :class="classes" @touchstart="handleTouchStart">
     <template v-for="target of targets" :key="target.id">
       <my-card-overlay></my-card-overlay>
     </template>
@@ -470,27 +416,62 @@ const { nowRef } = function () {
 <script type="text/html" id="main-app">
   <div class="container">
     <div class="full-column position-root">
+      
+      <!-- Modern Interactive Scoreboard Panel -->
       <div class="score-board">
-        <div>Score: {{ totalScore }} | High-Score: {{ highScore }}</div>
-        <div>Mouse-Score: {{ mouseScore }} {{ onlyMouse ? '*' : '' }} | Misses: {{ misses }}</div>
+        <div class="score-row">
+          <div class="main-score-container">
+            <span class="label-mini">Current Run</span>
+            <span class="score-prime">{{ totalScore }}</span>
+          </div>
+          <div class="main-score-container" style="text-align: right;">
+            <span class="label-mini">All-Time High</span>
+            <span class="score-prime" style="color: #ffd33d;">{{ highScore }}</span>
+          </div>
+        </div>
+        
+        <div class="stats-grid">
+          <div class="stat-box">
+            <span class="label-mini">Mouse Record <span v-if="isPureMouse" class="active-tag"></span></span>
+            <span class="stat-val">{{ mouseScore }}</span>
+          </div>
+          <div class="stat-box">
+            <span class="label-mini">Touch Record <span v-if="isPureTouch" class="active-tag"></span></span>
+            <span class="stat-val" style="color: #a371f7;">{{ touchScore }}</span>
+          </div>
+          <div class="stat-box">
+            <span class="label-mini">Input Track</span>
+            <span class="stat-val">{{ currentInputType }}</span>
+          </div>
+          <div class="stat-box">
+            <span class="label-mini">Fails</span>
+            <span class="stat-val miss">{{ misses }} / 3</span>
+          </div>
+        </div>
       </div>
+
+      <!-- Play Field -->
       <div class="card-array">
         <template v-for="i of cards">
-          <my-card :targets="targetsById.get(i)" @click="clicked(i)" :code="codes[i]"></my-card>
+          <my-card :targets="targetsById.get(i)" @click-action="clicked(i, $event)" :code="codes[i]"></my-card>
         </template>
       </div>
     </div>
+
+    <!-- Loss Modal Overlay -->
     <div v-if="hasLost" class="position-overlay" @click="handleLostClicked">
       <div class="lost-container">
         <div class="lost-banner">
-          <div class="lost-banner--text">You Lost!</div>
+          <div class="lost-banner--text">Run Ended</div>
           <div class="lost-banner--score">Score: {{ totalScore }}</div>
+          <div class="restart-hint">Tap screen or Space to reset</div>
         </div>
       </div>
     </div>
   </div>
 </script>
 
+<!-- Vue Component Logic Definitions -->
 <script>
 app.component("my-card-overlay", {
   template: "#my-card-overlay",
@@ -499,8 +480,8 @@ app.component("my-card-overlay", {
     Vue.onMounted(() => {
       if (el.current && el.current.animate) {
         el.current.animate([
-          { top: '50%', left: '50%', bottom: '50%', right: '50%' },
-          { top: '0', left: '0', bottom: '0', right: '0' },
+          { top: '50%', left: '50%', bottom: '50%', right: '50%', opacity: 1 },
+          { top: '0', left: '0', bottom: '0', right: '0', opacity: 0.25 },
         ], {
           duration: MAX_DELAY,
           iterations: 1, 
@@ -516,7 +497,7 @@ app.component("my-card", {
   props: {
     targets: Array,
   },
-  emits: ["click"],
+  emits: ["click-action"],
   setup (props, { emit }) {
     const { targets } = Vue.toRefs(props)
     const isActiveTarget = Vue.computed(() => {
@@ -525,12 +506,16 @@ app.component("my-card", {
     const classes = Vue.computed(() => {
       return { "card--active": isActiveTarget.current }
     })
-    const onClick = () => { emit("click") }
-    const handleTouchStart = (event) => {
-        emit("click")
-        if (event.cancelable) event.preventDefault()
+    const onMouseDown = (event) => {
+      // Discard clicks that are simulated from mobile touch taps
+      if (event.detail === 0) return; 
+      emit("click-action", "mouse")
     }
-    return { classes, onClick, handleTouchStart }
+    const handleTouchStart = (event) => {
+      emit("click-action", "touch")
+      if (event.cancelable) event.preventDefault()
+    }
+    return { classes, onMouseDown, handleTouchStart }
   }
 })
 
@@ -549,10 +534,21 @@ app.component("main-app", {
 
     const misses = Vue.ref(0)
     const missTimeoutIds = []
-    const onlyMouse = Vue.ref(true)
+    
+    // Independent Pure State Systems
+    const isPureMouse = Vue.ref(true)
+    const isPureTouch = Vue.ref(true)
 
-    const highScore = useComputedStorage('something-ominous', 0)
-    const mouseScore = useComputedStorage('something-outrageous', 0)
+    const highScore = useComputedStorage('v2-ominous-all', 0)
+    const mouseScore = useComputedStorage('v2-outrageous-mouse', 0)
+    const touchScore = useComputedStorage('v2-outstanding-touch', 0)
+
+    const currentInputType = Vue.computed(() => {
+      if (!isPureMouse.current && !isPureTouch.current) return "Keyboard / Hybrid"
+      if (isPureTouch.current && !isPureMouse.current) return "Touch Only"
+      if (isPureMouse.current && !isPureTouch.current) return "Mouse Only"
+      return "Ready"
+    })
 
     const targetsById = Vue.computed(() => {
       const map = new Map()
@@ -567,11 +563,23 @@ app.component("main-app", {
        hasLost.current = true
        lostTime = performance.now()
        if (totalScore.current > highScore.current) highScore.current = totalScore.current
-       if (onlyMouse.current && totalScore.current > mouseScore.current) mouseScore.current = totalScore.current
+       if (isPureMouse.current && totalScore.current > mouseScore.current) mouseScore.current = totalScore.current
+       if (isPureTouch.current && totalScore.current > touchScore.current) touchScore.current = totalScore.current
     }
 
-    const clicked = i => {
+    const clicked = (i, inputMethod) => {
       if (hasLost.current) return;
+      
+      // Update dynamic scoring validations statewise
+      if (inputMethod === "mouse") {
+        isPureTouch.current = false
+      } else if (inputMethod === "touch") {
+        isPureMouse.current = false
+      } else if (inputMethod === "keyboard") {
+        isPureMouse.current = false
+        isPureTouch.current = false
+      }
+
       const now = performance.now()
       const firstTargetIndex = targets.current.findIndex(x => x.index === i)
       if (firstTargetIndex >= 0) {
@@ -616,15 +624,15 @@ app.component("main-app", {
       totalScore.current = 0
       missTimeoutIds.forEach(id => clearTimeout(id))
       misses.current = 0
-      onlyMouse.current = true
+      isPureMouse.current = true
+      isPureTouch.current = true
     }
 
     const codes = pipe([7, 8, 9, 4, 5, 6, 1, 2, 3], pipe.map(x => `Numpad${x}`), collect)
 
     for (const [keybind, i] of enumerate(codes)) {
       useKeybind(keybind, () => {
-        onlyMouse.current = false;
-        clicked(i)
+        clicked(i, "keyboard")
       })
     }
 
@@ -634,7 +642,7 @@ app.component("main-app", {
 
     Vue.onMounted(() => { reset() })
 
-    const LOST_INTERACTIVE_DELAY = 1500
+    const LOST_INTERACTIVE_DELAY = 1000
     const handleLostClicked = () => {
         if (performance.now() - lostTime > LOST_INTERACTIVE_DELAY) {
            reset()
@@ -652,7 +660,10 @@ app.component("main-app", {
       codes,
       misses,
       mouseScore,
-      onlyMouse,
+      touchScore,
+      isPureMouse,
+      isPureTouch,
+      currentInputType,
       handleLostClicked,
     }
   }
