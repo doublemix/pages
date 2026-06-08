@@ -1,32 +1,130 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-<title>9-square</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>9-square</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      background: #EEE;
+      overscroll-behavior-y: contain;
+    }
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    table {
+      border-collapse: collapse;
+      border-spacing: 0;
+      margin: 0;
+      padding: 0;
+    }
+    td {
+      margin: 0;
+      padding: 0;
+    }
+    html {
+      font-family: 'Roboto', sans-serif;
+    }
+    html, body {
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+      min-height: 100vh;
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+    }
+    .full-column {
+      display: flex;
+      flex-flow: column nowrap;
+      justify-content: center;
+      flex-grow: 1;
+    }
+    .score-board {
+      font-size: 1.1rem;
+      margin-bottom: 15px;
+      text-align: center;
+      line-height: 1.5;
+    }
+    .card-array {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(3, 1fr);
+      width: 100%;
+    }
+    .card {
+      width: 100%;
+      aspect-ratio: 1 / 1; /* Guarantees blocks stay mathematically square on all screens */
+      background: white;
+      border-radius: 10px;
+      box-shadow: gray 0 2px 3px;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    .card--active {
+      background: #EEF;
+    }
+    .card-overlay {
+      border-radius: 10px;
+      border: 1px solid #889;
+    }
+    .position-root {
+      position: relative;
+    }
+    .position-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+    }
+    .lost-container {
+      display: flex;
+      flex-flow: column nowrap;
+      justify-content: center;
+      height: 100%;
+      background: #000A;
+    }
+    .lost-banner {
+      padding: 40px 20px;
+      background-color: red;
+      color: white;
+      font-size: 4rem;
+      text-align: center;
+      display: flex;
+      flex-flow: column nowrap;
+      justify-content: center;
+    }
+    .lost-banner--score {
+      font-size: 2rem;
+      margin-top: 10px;
+    }
+    @media (max-width: 400px) {
+      .lost-banner { font-size: 3rem; }
+      .lost-banner--score { font-size: 1.5rem; }
+      .score-board { font-size: 0.95rem; }
+    }
+  </style>
 </head>
 <body>
-<style>
-  body {
-    margin: 0;
-  }
-  * {
-    box-sizing: border-box;
-  }
-  table {
-    cell-spacing: 0;
-    border-collapse: collapse;
-    border-spacing: 0;
-    margin: 0;
-    padding: 0;
-  }
-  td {
-    margin: 0;
-    padding: 0;
-  }
-</style>
+
+<div id="app">
+  <main-app></main-app>
+</div>
+
 <script src="https://unpkg.com/vue@3"></script>
+
 <script>
+// --- Polyfills and Prototypes ---
 Array.prototype.remove = function (el) {
   const index = this.indexOf(el)
   if (index >= 0) {
@@ -50,24 +148,28 @@ Object.defineProperties(Array.prototype, {
     }
   }
 })
-{
-(() => {
-  function addCurrentAccesor (proto) {
-    const descriptor = Object.getOwnPropertyDescriptor(proto, 'value')
-    Object.defineProperties(proto, {
-      current: {
-        configurable: true,
-        enumerable: false,
-        get: descriptor.get,
-        set: descriptor.set,
-      }
-    })
-  }
-  addCurrentAccesor(Vue.ref().__proto__)
-  addCurrentAccesor(Vue.computed(() => {}).__proto__)
-  addCurrentAccesor(Vue.toRefs(Vue.reactive({ x: 0 })).x.__proto__)
-})()}
 
+// Custom Vue ref helpers
+{
+  (() => {
+    function addCurrentAccessor (proto) {
+      const descriptor = Object.getOwnPropertyDescriptor(proto, 'value')
+      Object.defineProperties(proto, {
+        current: {
+          configurable: true,
+          enumerable: false,
+          get: descriptor.get,
+          set: descriptor.set,
+        }
+      })
+    }
+    addCurrentAccessor(Vue.ref().__proto__)
+    addCurrentAccessor(Vue.computed(() => {}).__proto__)
+    addCurrentAccessor(Vue.toRefs(Vue.reactive({ x: 0 })).x.__proto__)
+  })()
+}
+
+// --- Utility Functions ---
 function pipe(init, ...fs) {
   return fs.reduce((curr, f) => f(curr), init)
 }
@@ -162,7 +264,6 @@ function *generateAllPermutations (arr) {
     yield []
     return
   }
-
   for (const i of range(0, arr.length)) {
     const newArray = arr.filter((x, j) => j != i)
     for (const sub of generateAllPermutations(newArray)) {
@@ -258,33 +359,29 @@ function listed (array, separator=', ', and=' and ', nothing='', oxford = true) 
   }).join('')
 }
 </script>
-<script>
-var app = Vue.createApp({})
-</script>
 
 <script>
+// --- Initialization & Global Setup ---
+var app = Vue.createApp({})
+
 const MAX_DELAY = 1000
 const MISS_DELAY = 5000
 const MAX_MISSES = 3
-app.config.globalProperties.$filters = {
-  listed,
-}
+
+app.config.globalProperties.$filters = { listed }
 app.config.globalProperties.maxDelay = MAX_DELAY
 
 function not(ref) {
   return Vue.computed(() => !ref.current)
 }
 
-
 function usePeriodic (effect, _getPeriod, enabledRef, debug) {
   let timeoutId = null
-
   const getPeriod = () => {
     const value = _getPeriod()
     if (debug) console.log(value)
     return value
   }
-
   function update () {
     if (enabledRef.current) {
       timeoutId = setTimeout(() => {
@@ -295,19 +392,16 @@ function usePeriodic (effect, _getPeriod, enabledRef, debug) {
       timeoutId = null
     }
   }
-
   update()
-
   Vue.watch(enabledRef, (isEnabled, wasEnabled) => {
     if (isEnabled && !wasEnabled && timeoutId === null) {
-      update() // need to restart was disabled
+      update()
     }
     if (wasEnabled && !isEnabled && timeoutId !== null) {
       clearTimeout(timeoutId)
       timeoutId = null
     }
   })
-
   Vue.onUnmounted(() => {
     clearTimeout(timeoutId)
   })
@@ -335,15 +429,11 @@ class ListMap extends DefaultMap {
 const { useKeybind } = function () {
   const registrations = new ListMap()
   function handler (event) {
-    registrations.get(event.code).forEach(h => {
-      h()
-    })   
+    registrations.get(event.code).forEach(h => { h() })   
   }
   document.addEventListener("keydown", handler)
   function useKeybind (keycode, handler) {
-    function uniqueHandler () {
-      handler()
-    }
+    function uniqueHandler () { handler() }
     registrations.get(keycode).push(uniqueHandler)
     Vue.onUnmounted(() => {
       registrations.get(keycode).remove(uniqueHandler)
@@ -354,181 +444,35 @@ const { useKeybind } = function () {
 
 const { nowRef } = function () {
   const nowRef = Vue.ref(performance.now())
-
   function update () {
     setTimeout(() => {
       nowRef.current = performance.now()
       update()
     }, 50)
   }
-
   update()
-
   return { nowRef }
 }()
 </script>
 
-<style>
-html {
-  font-family: 'Roboto', sans-serif;
-}
-html, body {
-  min-height: 100vh;
-}
-body {
-  background: #EEE;
-}
-.container {
-  max-width: 720px;
-  margin-left: auto;
-  margin-right: auto;
-  min-height: 100%;
-}
-.full-column {
-  display: flex;
-  flex-flow: column nowrap;
-  height: 100%;
-}
-.mt {
-  padding-top:20px;
-}
-.mb {
-  padding-bottom: 20px;
-}
-.card-array {
-  display: grid;
-  gap: 20px;
-  grid-template-columns: repeat(3, 1fr);
-}
-.card {
-  min-height: 210px;
-  background: white;
-  border-radius: 10px;
-  box-shadow: gray 0 2px 3px
-}
-.card--active {
-  background: #EEF;
-}
-.card-overlay {
-  /* background: #889; */
-  border-radius: 10px;
-  border: 1px solid #889;
-}
-
-.position-root {
-  position: relative;
-}
-.position-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-}
-.lost-container {
-  display: flex;
-  flex-flow: column nowrap;
-  justify-content: center;
-  height: 100%;
-  background: #000A;
-}
-.lost-banner {
-  height: 200px;
-  background-color: red;
-  color: white;
-  font-size:  6rem;
-  text-align: center;
-  display: flex;
-  flex-flow: column nowrap;
-  justify-content: center;
-}
-.lost-banner--score {
-  font-size: 3rem;
-}
-.button {background: #DDE;border: 1px outset gray;border-radius: 5px;padding: 4px 10px;font-family: inherit;font-size: 1rem;cursor: pointer;}
-
-.button:hover {
-    background: #AAB;
-}
-
-.button:active {
-    background: #887;
-}
-</style>
-
 <script type="text/html" id="my-card-overlay">
   <div ref="el" class="card-overlay position-overlay"></div>
-</script>
-<script>
-app.component("my-card-overlay", {
-  template: "#my-card-overlay",
-  setup () {
-    const el = Vue.ref(null)
-    Vue.onMounted(() => {
-      el.current.animate([
-        { top: '50%', left: '50%', bottom: '50%', right: '50%' },
-        { top: '0', left: '0', bottom: '0', right: '0' },
-      ], {
-        duration: MAX_DELAY,
-        iterations: 1, 
-      })
-    })
-    return {
-      el
-    }
-  }
-})
 </script>
 
 <script type="text/html" id="my-card">
   <div @click="onClick" class="card position-root" :class="classes" @touchstart="handleTouchStart">
     <template v-for="target of targets" :key="target.id">
-      <my-card-overlay>
-      </my-card-overlay>
+      <my-card-overlay></my-card-overlay>
     </template>
   </div>
 </script>
-<script>
-app.component("my-card", {
-  template: "#my-card",
-  props: {
-    targets: Array,
-  },
-  emits: ["click"],
-  setup (props, { emit }) {
-    const { targets } = Vue.toRefs(props)
-
-    const isActiveTarget = Vue.computed(() => {
-      return targets.current.some(x => true)
-    })
-    const classes = Vue.computed(() => {
-      return {
-        "card--active": isActiveTarget.current,
-      }
-    })
-    const onClick = () => {
-      emit("click")
-    }
-    const handleTouchStart = (event) => {
-        emit("click")
-        if (event.cancelable) event.preventDefault()
-    }
-    return {
-      classes,
-      onClick,
-      handleTouchStart,
-    }
-  }
-})
-</script>
-
 
 <script type="text/html" id="main-app">
   <div class="container">
-    <div class="full-column mt mb position-root">
-      <div>Score: {{ totalScore }}; High-Score: {{ highScore }}; Mouse-Score: {{ mouseScore }} {{ onlyMouse ? '*' : '' }}</div>
-      <div>
-        Misses: {{ misses }}
+    <div class="full-column position-root">
+      <div class="score-board">
+        <div>Score: {{ totalScore }} | High-Score: {{ highScore }}</div>
+        <div>Mouse-Score: {{ mouseScore }} {{ onlyMouse ? '*' : '' }} | Misses: {{ misses }}</div>
       </div>
       <div class="card-array">
         <template v-for="i of cards">
@@ -537,16 +481,59 @@ app.component("my-card", {
       </div>
     </div>
     <div v-if="hasLost" class="position-overlay" @click="handleLostClicked">
-        <div class="lost-container">
-          <div class="lost-banner">
-            <div class="lost-banner--text">You Lost!</div>
-            <div class="lost-banner--score">Score: {{ totalScore }}</div>
-          </div>
+      <div class="lost-container">
+        <div class="lost-banner">
+          <div class="lost-banner--text">You Lost!</div>
+          <div class="lost-banner--score">Score: {{ totalScore }}</div>
         </div>
       </div>
+    </div>
   </div>
 </script>
+
 <script>
+app.component("my-card-overlay", {
+  template: "#my-card-overlay",
+  setup () {
+    const el = Vue.ref(null)
+    Vue.onMounted(() => {
+      if (el.current && el.current.animate) {
+        el.current.animate([
+          { top: '50%', left: '50%', bottom: '50%', right: '50%' },
+          { top: '0', left: '0', bottom: '0', right: '0' },
+        ], {
+          duration: MAX_DELAY,
+          iterations: 1, 
+        })
+      }
+    })
+    return { el }
+  }
+})
+
+app.component("my-card", {
+  template: "#my-card",
+  props: {
+    targets: Array,
+  },
+  emits: ["click"],
+  setup (props, { emit }) {
+    const { targets } = Vue.toRefs(props)
+    const isActiveTarget = Vue.computed(() => {
+      return targets.current.some(x => true)
+    })
+    const classes = Vue.computed(() => {
+      return { "card--active": isActiveTarget.current }
+    })
+    const onClick = () => { emit("click") }
+    const handleTouchStart = (event) => {
+        emit("click")
+        if (event.cancelable) event.preventDefault()
+    }
+    return { classes, onClick, handleTouchStart }
+  }
+})
+
 app.component("main-app", {
   template: "#main-app",
   setup () {
@@ -555,25 +542,21 @@ app.component("main-app", {
       return () => currId++
     })()
     const cards = pipe(9, range, collect)
-
     const targets = Vue.ref([])
-
     const totalScore = Vue.ref(0)
     const hasLost = Vue.ref(false)
     let lostTime = null
 
     const misses = Vue.ref(0)
     const missTimeoutIds = []
-    const onlyMouse = Vue.ref(true);
+    const onlyMouse = Vue.ref(true)
 
     const highScore = useComputedStorage('something-ominous', 0)
     const mouseScore = useComputedStorage('something-outrageous', 0)
 
     const targetsById = Vue.computed(() => {
       const map = new Map()
-      cards.forEach(i => {
-        map.set(i, [])
-      })
+      cards.forEach(i => { map.set(i, []) })
       for (const t of targets.current) {
         map.get(t.index).push(t)
       }
@@ -597,7 +580,7 @@ app.component("main-app", {
         if (score > 0) {
           totalScore.current += Math.floor(score)
         }
-         targets.current.splice(firstTargetIndex, 1)
+        targets.current.splice(firstTargetIndex, 1)
       } else {
         misses.current++
         missTimeoutIds.push(setTimeout(() => {
@@ -610,8 +593,8 @@ app.component("main-app", {
     }
 
     const gameStartTime = Vue.ref(performance.now())
-    // const period = () => Math.max((1 - (performance.now() - gameStartTime.current) / 60000) * 3000, 100)
     const period = () => Math.floor(1000 * Math.pow(Math.E, -(performance.now() - gameStartTime.current) * Math.log(0.33333) / -60000))
+    
     usePeriodic(function () {
       if (!hasLost.current) { targets.current.push({ id: getId(), index: randomInt(0, 9), when: performance.now() }) }
     }, period, not(hasLost))
@@ -646,12 +629,11 @@ app.component("main-app", {
     }
 
     useKeybind("Space", () => {
-      if (hasLost.current)
-        reset()
+      if (hasLost.current) reset()
     })
 
     Vue.onMounted(() => { reset() })
-    
+
     const LOST_INTERACTIVE_DELAY = 1500
     const handleLostClicked = () => {
         if (performance.now() - lostTime > LOST_INTERACTIVE_DELAY) {
@@ -675,23 +657,9 @@ app.component("main-app", {
     }
   }
 })
-</script>
 
-<div id="app">
-  <main-app></main-app>
-</div>
-<script>
+// Mount App
 window.root = app.mount("#app")
 </script>
-</body>
-</html>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Page title</title>
-</head>
-<body>
-    
 </body>
 </html>
