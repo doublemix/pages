@@ -82,15 +82,16 @@
       line-height: 1.1;
     }
     .stats-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
       border-top: 1px solid rgba(48, 54, 61, 0.5);
       padding-top: 12px;
     }
     .stat-box {
       display: flex;
       flex-direction: column;
+      min-height: 38px; /* Ensures layout stays aligned when empty */
     }
     .stat-val {
       font-family: 'JetBrains Mono', monospace;
@@ -268,9 +269,9 @@
       justify-content: center;
       align-items: center;
       z-index: 100;
-      cursor: pointer;
       box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.8);
       animation: freeze-overlay-fade 1.15s forwards; /* Fades backdrop after 0.65s delay */
+      cursor: pointer;
     }
     @keyframes freeze-title-pop {
       0% { transform: scale(0.85); opacity: 0; }
@@ -320,7 +321,7 @@
       box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
     }
     
-    /* Lobby Screen Specific */
+    /* Lobby Screen Specific - Restored to classic Blue branding */
     .lobby-banner {
       border-color: #58a6ff;
       box-shadow: 0 16px 48px rgba(88, 166, 255, 0.15);
@@ -338,10 +339,10 @@
       margin-bottom: 28px;
     }
     
-    /* Input Instructions list */
+    /* Input Tracks List Section - Stays styled with premium purple */
     .controls-panel {
       background: rgba(22, 27, 34, 0.6);
-      border: 1px solid rgba(48, 54, 61, 0.5);
+      border: 1px solid rgba(163, 113, 247, 0.3);
       border-radius: 12px;
       padding: 16px;
       margin-bottom: 28px;
@@ -350,32 +351,26 @@
     .controls-title {
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.75rem;
-      color: #8b949e;
+      color: #a371f7;
       text-transform: uppercase;
       letter-spacing: 0.1em;
       margin-bottom: 12px;
-      border-bottom: 1px solid rgba(48, 54, 61, 0.5);
+      border-bottom: 1px solid rgba(163, 113, 247, 0.3);
       padding-bottom: 6px;
+      text-align: center;
     }
     .controls-row {
       display: flex;
       align-items: center;
-      gap: 10px;
-      margin-bottom: 8px;
-      font-size: 0.9rem;
-      color: #c9d1d9;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 10px;
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #f0f6fc;
     }
     .controls-row:last-child {
       margin-bottom: 0;
-    }
-    .key-badge {
-      background: #21262d;
-      border: 1px solid #30363d;
-      border-radius: 6px;
-      padding: 2px 8px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.75rem;
-      color: #58a6ff;
     }
 
     /* Lost Banner Specific */
@@ -384,7 +379,7 @@
       box-shadow: 0 16px 48px rgba(255, 123, 114, 0.18);
     }
     .lost-banner--text {
-      font-size: 2.5rem;
+      font-size: 2rem;
       font-weight: 800;
       color: #ff7b72;
       letter-spacing: -0.02em;
@@ -400,49 +395,43 @@
       padding: 4px 14px;
       border-radius: 20px;
       margin-top: 10px;
-      margin-bottom: 20px;
+      margin-bottom: 12px;
       letter-spacing: 0.08em;
     }
-    .lost-banner--score {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 1.5rem;
-      color: #c9d1d9;
-      margin: 10px 0;
-    }
-    
-    /* Record Celebration Badges */
-    .celebrations-container {
+
+    /* --- Monotone Inline Run Stats --- */
+    .run-stats-row {
       display: flex;
-      flex-direction: column;
-      gap: 8px;
-      margin: 15px 0 24px 0;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      gap: 18px;
+      margin-bottom: 24px;
+      padding: 10px;
+      background: rgba(22, 27, 34, 0.4);
+      border: 1px solid rgba(48, 54, 61, 0.3);
+      border-radius: 12px;
     }
-    .record-badge {
+    .run-stat-item {
       display: flex;
       align-items: center;
-      justify-content: center;
-      gap: 8px;
-      background: rgba(242, 199, 68, 0.1);
-      border: 1px solid rgba(242, 199, 68, 0.3);
-      color: #f2c744;
-      border-radius: 8px;
-      padding: 8px 12px;
-      font-weight: 600;
-      font-size: 0.85rem;
-      letter-spacing: 0.02em;
-      animation: pulse 1.5s infinite;
+      gap: 6px;
+      color: #8b949e;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.9rem;
     }
-    .record-badge.touch-badge {
-      background: rgba(163, 113, 247, 0.1);
-      border-color: rgba(163, 113, 247, 0.3);
-      color: #a371f7;
+    .run-stat-icon {
+      width: 16px;
+      height: 16px;
+      color: #8b949e;
+      display: inline-block;
+      vertical-align: middle;
     }
-    .record-badge.mouse-badge {
-      background: rgba(57, 211, 83, 0.1);
-      border-color: rgba(57, 211, 83, 0.3);
-      color: #39d353;
+    .run-stat-value {
+      font-weight: 700;
+      color: #f0f6fc;
     }
-
+    
     /* Common Button Formatting */
     .btn-action {
       background: #238636;
@@ -735,7 +724,49 @@ const { nowRef } = function () {
       <div class="score-board">
         <div class="score-row">
           <div class="main-score-container">
-            <span class="label-mini">Current Run</span>
+            <span class="label-mini" style="display: flex; align-items: center; gap: 6px;">
+              Current Run
+              <!-- Dynamic Header Track Icon Indicator -->
+              <span v-if="activeTrack" style="display: inline-flex; align-items: center;">
+                <template v-if="activeTrack === 'keyboard'">
+                  <svg class="run-stat-icon" style="color: #58a6ff; width: 12px; height: 12px;" viewBox="0 0 24 24" fill="currentColor">
+                    <rect x="2" y="2" width="5" height="5" rx="1"/>
+                    <rect x="9.5" y="2" width="5" height="5" rx="1"/>
+                    <rect x="17" y="2" width="5" height="5" rx="1"/>
+                    <rect x="2" y="9.5" width="5" height="5" rx="1"/>
+                    <rect x="9.5" y="9.5" width="5" height="5" rx="1"/>
+                    <rect x="17" y="9.5" width="5" height="5" rx="1"/>
+                    <rect x="2" y="17" width="5" height="5" rx="1"/>
+                    <rect x="9.5" y="17" width="5" height="5" rx="1"/>
+                    <rect x="17" y="17" width="5" height="5" rx="1"/>
+                  </svg>
+                </template>
+                <template v-else-if="activeTrack === 'mouse'">
+                  <svg class="run-stat-icon" style="color: #39d353; width: 12px; height: 12px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="5" y="2" width="14" height="20" rx="7"/>
+                    <path d="M12 2v6"/>
+                    <path d="M5 10h14"/>
+                  </svg>
+                </template>
+                <template v-else-if="activeTrack === 'touch'">
+                  <svg class="run-stat-icon" style="color: #a371f7; width: 12px; height: 12px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 11V4a2 2 0 0 1 4 0v7"/>
+                    <path d="M8 13V8.5a1.5 1.5 0 0 1 3 0V11"/>
+                    <path d="M16 11.5V10a1.5 1.5 0 0 1 3 0v4.5a6 6 0 0 1-6 6h-2a6 6 0 0 1-6-6V13a1.5 1.5 0 0 1 3 0V13"/>
+                  </svg>
+                </template>
+                <template v-else-if="activeTrack === 'aim-tap'">
+                  <svg class="run-stat-icon" style="color: #a371f7; width: 12px; height: 12px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="7" />
+                    <line x1="12" y1="1" x2="12" y2="5" />
+                    <line x1="12" y1="19" x2="12" y2="23" />
+                    <line x1="1" y1="12" x2="5" y2="12" />
+                    <line x1="19" y1="12" x2="23" y2="12" />
+                    <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+                  </svg>
+                </template>
+              </span>
+            </span>
             <span class="score-prime">{{ totalScore }}</span>
           </div>
           <div class="main-score-container" style="text-align: right;">
@@ -744,32 +775,16 @@ const { nowRef } = function () {
           </div>
         </div>
         
+        <!-- Streamlined Stats Block with Centered Strikes Indicator -->
         <div class="stats-grid">
-          <div class="stat-box">
-            <span class="label-mini">Mouse Record <span v-if="isPureMouse" class="active-tag"></span></span>
-            <span class="stat-val">{{ mouseScore }}</span>
-          </div>
-          <div class="stat-box">
-            <span class="label-mini">Touch Record <span v-if="isPureTouch" class="active-tag"></span></span>
-            <span class="stat-val" style="color: #a371f7;">{{ touchScore }}</span>
-          </div>
-          <div class="stat-box">
-            <span class="label-mini">Input Track</span>
-            <span class="stat-val">{{ currentInputType }}</span>
-          </div>
-          
-          <!-- Modern Dynamic Strike Bays -->
-          <div class="stat-box">
+          <div class="stat-box" style="align-items: center;">
             <span class="label-mini">Strikes</span>
             <div class="strike-indicator">
               <div v-for="idx in [0, 1, 2]" :key="idx" class="strike-circle">
                 <svg class="strike-ring" width="32" height="32" viewBox="0 0 32 32">
-                  <!-- Standby Background Slot Boundary -->
                   <circle cx="16" cy="16" r="12" fill="none" stroke="#30363d" stroke-width="2" />
                   <template v-if="isStrikeActive(idx)">
-                    <!-- Triggered Core Indicator -->
                     <circle cx="16" cy="16" r="9" fill="#ff7b72" />
-                    <!-- Visual Countdown Perimeter (Radius 12, Circumference = 75.4) -->
                     <circle 
                       cx="16" 
                       cy="16" 
@@ -783,7 +798,6 @@ const { nowRef } = function () {
                     />
                   </template>
                 </svg>
-                <!-- Central Indicator Icon -->
                 <div class="strike-x" v-if="isStrikeActive(idx)">
                   <svg width="10" height="10" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M2 2L10 10M10 2L2 10" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
@@ -797,7 +811,6 @@ const { nowRef } = function () {
 
       <!-- Play Field Wrapper Container -->
       <div class="grid-container-wrapper">
-        <!-- Play Field Grid Layout -->
         <div class="card-array">
           <template v-for="i of cards">
             <my-card 
@@ -806,16 +819,23 @@ const { nowRef } = function () {
               :shaking="shakingCards.has(i)"
               :is-overloaded="overloadedCardIndex === i"
               :is-frozen="isFrozenOnLoss"
-              @click-action="clicked(i, $event)" 
+              @click-action="clicked(i, $event)"
+              @mouseenter="hoveredCardIndex = i"
+              @mouseleave="hoveredCardIndex = null"
               :code="codes[i]">
             </my-card>
           </template>
         </div>
 
-        <!-- FREEZE INTERMISSION SCREEN (Interactive banner directly over board on failure) -->
-        <div v-if="isFrozenOnLoss" class="freeze-banner-overlay" @mousedown="proceedToSummary" @touchstart="proceedToSummary">
+        <!-- FREEZE INTERMISSION SCREEN -->
+        <div 
+          v-if="isFrozenOnLoss" 
+          class="freeze-banner-overlay" 
+          @click.stop.prevent="proceedToSummary"
+          @touchstart.stop.prevent="proceedToSummary"
+        >
           <div class="freeze-title">{{ detailedLostReason }}</div>
-          <div class="freeze-sub" v-if="isProceedReady">Tap anywhere to continue</div>
+          <div class="freeze-sub" v-if="isProceedReady">{{ freezeActionMessage }}</div>
           <div class="freeze-sub" v-else style="opacity: 0.5;">Analyzing Fault...</div>
         </div>
       </div>
@@ -827,20 +847,57 @@ const { nowRef } = function () {
         <div class="lobby-title">GRID REFLEX</div>
         <div class="lobby-subtitle">Arcade Reaction & Speed Testing Unit</div>
         
-        <!-- Controls Setup Guide -->
+        <!-- Streamlined Input Tracks Setup Guide (Purple Accents Only) -->
         <div class="controls-panel">
-          <div class="controls-title">Configured Input Channels</div>
+          <div class="controls-title">Input Tracks</div>
+          
+          <!-- Mouse Track -->
           <div class="controls-row">
-            <span class="key-badge">🖱️ Mouse Mousedown</span>
-            <span>Triggers Mouse Track</span>
+            <svg class="run-stat-icon" style="color: #a371f7; width: 18px; height: 18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="5" y="2" width="14" height="20" rx="7"/>
+              <path d="M12 2v6"/>
+              <path d="M5 10h14"/>
+            </svg>
+            <span style="color: #a371f7; font-weight: 700;">Mouse</span>
           </div>
+          
+          <!-- Touch Track -->
           <div class="controls-row">
-            <span class="key-badge">📱 Direct Touch</span>
-            <span>Triggers Touch Track</span>
+            <svg class="run-stat-icon" style="color: #a371f7; width: 18px; height: 18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 11V4a2 2 0 0 1 4 0v7"/>
+              <path d="M8 13V8.5a1.5 1.5 0 0 1 3 0V11"/>
+              <path d="M16 11.5V10a1.5 1.5 0 0 1 3 0v4.5a6 6 0 0 1-6 6h-2a6 6 0 0 1-6-6V13a1.5 1.5 0 0 1 3 0V13"/>
+            </svg>
+            <span style="color: #a371f7; font-weight: 700;">Touch</span>
           </div>
+          
+          <!-- Keyboard Track -->
           <div class="controls-row">
-            <span class="key-badge">⌨️ Numpad 1-9</span>
-            <span>Triggers Key Track (789, 456, 123)</span>
+            <svg class="run-stat-icon" style="color: #a371f7; width: 18px; height: 18px;" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="2" y="2" width="5" height="5" rx="1"/>
+              <rect x="9.5" y="2" width="5" height="5" rx="1"/>
+              <rect x="17" y="2" width="5" height="5" rx="1"/>
+              <rect x="2" y="9.5" width="5" height="5" rx="1"/>
+              <rect x="9.5" y="9.5" width="5" height="5" rx="1"/>
+              <rect x="17" y="9.5" width="5" height="5" rx="1"/>
+              <rect x="2" y="17" width="5" height="5" rx="1"/>
+              <rect x="9.5" y="17" width="5" height="5" rx="1"/>
+              <rect x="17" y="17" width="5" height="5" rx="1"/>
+            </svg>
+            <span style="color: #a371f7; font-weight: 700;">Keyboard</span>
+          </div>
+
+          <!-- Aim-Tap Track -->
+          <div class="controls-row">
+            <svg class="run-stat-icon" style="color: #a371f7; width: 18px; height: 18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="7" />
+              <line x1="12" y1="1" x2="12" y2="5" />
+              <line x1="12" y1="19" x2="12" y2="23" />
+              <line x1="1" y1="12" x2="5" y2="12" />
+              <line x1="19" y1="12" x2="23" y2="12" />
+              <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+            </svg>
+            <span style="color: #a371f7; font-weight: 700;">Aim-Tap</span>
           </div>
         </div>
 
@@ -855,22 +912,106 @@ const { nowRef } = function () {
         <div class="lost-banner--text">Run Ended</div>
         <div class="lost-reason-badge">{{ detailedLostReason }}</div>
         
-        <div class="lost-banner--score">Final Score: {{ totalScore }}</div>
-
-        <!-- Dynamic Milestone Celebration Container -->
-        <div class="celebrations-container" v-if="newAllTimeHigh || newMouseHigh || newTouchHigh">
-          <div class="record-badge" v-if="newAllTimeHigh">
-            👑 NEW ALL-TIME HIGH RECORD set!
+        <!-- Large Score Display Section -->
+        <div style="margin: 20px 0;">
+          <div class="label-mini" :style="{ color: newAllTimeHigh ? '#ffd33d' : '#58a6ff' }" style="font-size: 0.9rem; font-weight: 800; letter-spacing: 0.15em;">
+            {{ newAllTimeHigh ? 'NEW HIGH SCORE' : 'SCORE' }}
           </div>
-          <div class="record-badge mouse-badge" v-if="newMouseHigh">
-            🖱️ NEW MOUSE-ONLY HIGHSCORE set!
-          </div>
-          <div class="record-badge touch-badge" v-if="newTouchHigh">
-            🎯 NEW TOUCH-ONLY HIGHSCORE set!
+          <div :style="{ color: newAllTimeHigh ? '#ffd33d' : '#58a6ff' }" style="font-size: 4.5rem; font-weight: 800; line-height: 1.1; font-family: 'Outfit', sans-serif;">
+            {{ totalScore }}
           </div>
         </div>
 
-        <!-- Try Again Button (Instantly clickable since Freeze frame handles safety lockouts) -->
+        <!-- Inline Run Statistics Block -->
+        <div class="run-stats-row">
+          <!-- Stopwatch Icon: Time Alive -->
+          <div class="run-stat-item" title="Total Time Alive">
+            <svg class="run-stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="13" r="8"/>
+              <path d="M12 5V1"/>
+              <path d="M10 1h4"/>
+              <path d="M12 9v4l2.5 1.5"/>
+            </svg>
+            <span class="run-stat-value">{{ formattedTimeAlive }}s</span>
+          </div>
+
+          <!-- Target Icon: Correctly Cleared Tiles -->
+          <div class="run-stat-item" title="Correctly Cleared Tiles">
+            <svg class="run-stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <circle cx="12" cy="12" r="6"/>
+              <circle cx="12" cy="12" r="2"/>
+            </svg>
+            <span class="run-stat-value">{{ runCorrectClicks }}</span>
+          </div>
+
+          <!-- Circular X Cutout Icon: Total Strikes Logged -->
+          <div class="run-stat-item" title="Total Run Strikes Logged">
+            <svg class="run-stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M15 9l-6 6"/>
+              <path d="M9 9l6 6"/>
+            </svg>
+            <span class="run-stat-value">{{ runTotalStrikes }}</span>
+          </div>
+        </div>
+
+        <!-- Input Track Score Section (Displayed only if run completed on a single input track) -->
+        <div v-if="endRunTrack" style="margin: 16px 0; padding: 12px; background: rgba(22, 27, 34, 0.5); border: 1px solid rgba(48, 54, 61, 0.4); border-radius: 12px; text-align: center;">
+          <div class="label-mini" style="font-size: 0.75rem; letter-spacing: 0.1em; color: #8b949e; margin-bottom: 6px;">
+            TRACK RECORD
+          </div>
+          <div style="display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700;">
+            <span :style="{ color: endRunTrackColor }" style="font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
+               <template v-if="endRunTrack === 'keyboard'">
+                 <svg class="run-stat-icon" style="color: #58a6ff; width: 16px; height: 16px;" viewBox="0 0 24 24" fill="currentColor">
+                   <rect x="2" y="2" width="5" height="5" rx="1"/>
+                   <rect x="9.5" y="2" width="5" height="5" rx="1"/>
+                   <rect x="17" y="2" width="5" height="5" rx="1"/>
+                   <rect x="2" y="9.5" width="5" height="5" rx="1"/>
+                   <rect x="9.5" y="9.5" width="5" height="5" rx="1"/>
+                   <rect x="17" y="9.5" width="5" height="5" rx="1"/>
+                   <rect x="2" y="17" width="5" height="5" rx="1"/>
+                   <rect x="9.5" y="17" width="5" height="5" rx="1"/>
+                   <rect x="17" y="17" width="5" height="5" rx="1"/>
+                 </svg>
+               </template>
+               <template v-else-if="endRunTrack === 'mouse'">
+                 <svg class="run-stat-icon" style="color: #39d353; width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                   <rect x="5" y="2" width="14" height="20" rx="7"/>
+                   <path d="M12 2v6"/>
+                   <path d="M5 10h14"/>
+                 </svg>
+               </template>
+               <template v-else-if="endRunTrack === 'touch'">
+                 <svg class="run-stat-icon" style="color: #a371f7; width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                   <path d="M12 11V4a2 2 0 0 1 4 0v7"/>
+                   <path d="M8 13V8.5a1.5 1.5 0 0 1 3 0V11"/>
+                   <path d="M16 11.5V10a1.5 1.5 0 0 1 3 0v4.5a6 6 0 0 1-6 6h-2a6 6 0 0 1-6-6V13a1.5 1.5 0 0 1 3 0V13"/>
+                 </svg>
+               </template>
+               <template v-else-if="endRunTrack === 'aim-tap'">
+                 <svg class="run-stat-icon" style="color: #a371f7; width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                   <circle cx="12" cy="12" r="7" />
+                   <line x1="12" y1="1" x2="12" y2="5" />
+                   <line x1="12" y1="19" x2="12" y2="23" />
+                   <line x1="1" y1="12" x2="5" y2="12" />
+                   <line x1="19" y1="12" x2="23" y2="12" />
+                   <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+                 </svg>
+               </template>
+
+               <template v-if="endRunTrackIsNewHigh">
+                 New High-Score
+               </template>
+               <template v-else>
+                 High-Score: <span style="color: #f0f6fc; font-family: 'JetBrains Mono', monospace; margin-left: 4px;">{{ endRunTrackRecord }}</span>
+               </template>
+            </span>
+          </div>
+        </div>
+
+        <!-- Try Again Button (Protected by transition cooldown) -->
         <button class="btn-action" @click="startGame">
           TRY AGAIN
         </button>
@@ -882,7 +1023,6 @@ const { nowRef } = function () {
 
 <!-- Vue Component Logic Definitions -->
 <script>
-// Instantiate Vue App cleanly (ONLY once in the entire ecosystem)
 const app = Vue.createApp({});
 
 const MAX_DELAY = 1000;
@@ -906,7 +1046,7 @@ app.component("my-card-overlay", {
         ], {
           duration: MAX_DELAY,
           iterations: 1, 
-          fill: 'forwards' // Stay at final animation step if finished
+          fill: 'forwards'
         });
         
         if (props.isFrozen) {
@@ -952,12 +1092,10 @@ app.component("my-card", {
       };
     });
     const onMouseDown = (event) => {
-      // Primary button clicks only
       if (event.button !== 0) return;
       emit("click-action", "mouse");
     };
     const onTouchStart = (event) => {
-      // Instantly suppress native mobile touch scrolling and simulated clicks
       event.preventDefault();
       emit("click-action", "touch");
     };
@@ -983,36 +1121,68 @@ app.component("main-app", {
     const hasLost = Vue.ref(false);
     
     let lostTime = null;
+    let lastTransitionTime = 0; // Cooldown shield timestamp
+
+    // Run metrics state references
+    const runCorrectClicks = Vue.ref(0);
+    const runTotalStrikes = Vue.ref(0);
+    const runDurationSeconds = Vue.ref(0);
 
     // Track active strike slot states directly to prevent slot "jumping"
-    const strikeSlots = Vue.ref([null, null, null]); // holds either null or { id, timestamp }
+    const strikeSlots = Vue.ref([null, null, null]); 
     const misses = Vue.computed(() => strikeSlots.value.filter(s => s !== null).length);
     
     // Live feedback animation structures
     const shakingCards = Vue.ref(new Set());
     const scoreFloaters = Vue.ref([]);
     const overloadedCardIndex = Vue.ref(null);
+    const hoveredCardIndex = Vue.ref(null); // Aim-Tap target tracker
 
     // Run failure analytics
     const detailedLostReason = Vue.ref("");
     const newAllTimeHigh = Vue.ref(false);
     const newMouseHigh = Vue.ref(false);
     const newTouchHigh = Vue.ref(false);
+    const newKeyboardHigh = Vue.ref(false);
+    const newAimTapHigh = Vue.ref(false);
 
     // Pure input tracking status flags
     const isPureMouse = Vue.ref(true);
     const isPureTouch = Vue.ref(true);
+    const isPureKeyboard = Vue.ref(true);
+    const isPureAimTap = Vue.ref(true);
+
+    // Run-end track metadata
+    const endRunTrack = Vue.ref(null);
+    const endRunTrackRecord = Vue.ref(0);
+    const endRunTrackIsNewHigh = Vue.ref(false);
+    const endRunTrackColor = Vue.ref("#58a6ff");
 
     const highScore = useComputedStorage('v2-ominous-all', 0);
     const mouseScore = useComputedStorage('v2-outrageous-mouse', 0);
     const touchScore = useComputedStorage('v2-outstanding-touch', 0);
+    const keyboardScore = useComputedStorage('v2-outstanding-keyboard', 0);
+    const aimTapScore = useComputedStorage('v2-outstanding-aim-tap', 0);
 
-    const currentInputType = Vue.computed(() => {
-      if (!isPlaying.value && !isFrozenOnLoss.value && !hasLost.value) return "Stopped";
-      if (!isPureMouse.value && !isPureTouch.value) return "Keyboard / Hybrid";
-      if (isPureTouch.value && !isPureMouse.value) return "Touch Only";
-      if (isPureMouse.value && !isPureTouch.value) return "Mouse Only";
-      return "Ready";
+    // Completely generic, inclusive continuation text instruction
+    const freezeActionMessage = Vue.computed(() => {
+      return 'Tap, click, or press Space to continue';
+    });
+
+    // Determines active pure qualifying track (At start/all-true or mixed, returns null)
+    const activeTrack = Vue.computed(() => {
+      const activeCount = [isPureMouse.value, isPureTouch.value, isPureKeyboard.value, isPureAimTap.value].filter(Boolean).length;
+      if (activeCount === 1) {
+        if (isPureMouse.value) return 'mouse';
+        if (isPureTouch.value) return 'touch';
+        if (isPureKeyboard.value) return 'keyboard';
+        if (isPureAimTap.value) return 'aim-tap';
+      }
+      return null;
+    });
+
+    const formattedTimeAlive = Vue.computed(() => {
+      return runDurationSeconds.value.toFixed(1);
     });
 
     const targetsById = Vue.computed(() => {
@@ -1032,7 +1202,6 @@ app.component("main-app", {
       const strike = strikeSlots.value[idx];
       if (!strike) return 75.4;
       
-      // If frozen or summarizing, freeze animation countdown rings right in place
       const refTime = (isFrozenOnLoss.value || hasLost.value) ? lostTime : nowRef.value;
       const elapsed = refTime - strike.timestamp;
       const remaining = Math.max(0, MISS_DELAY - elapsed);
@@ -1040,34 +1209,58 @@ app.component("main-app", {
       return 75.4 * (1 - ratio);
     };
 
-    const handleLose = (reason) => {
+    const handleLose = (reason, strikeTileIndex = null) => {
        isPlaying.value = false;
        lostTime = performance.now();
        
-       // Handle overloaded tile tracking
+       runDurationSeconds.value = Math.max(0, (lostTime - gameStartTime.value) / 1000);
+
        if (reason === 'expired') {
          detailedLostReason.value = "OVERLOADED";
          if (targets.value.length > 0) {
-           // Find the oldest target that triggered the timeout failure
            const oldest = targets.value.reduce((min, t) => t.when < min.when ? t : min, targets.value[0]);
            overloadedCardIndex.value = oldest ? oldest.index : null;
          }
        } else {
          detailedLostReason.value = "STRIKE-OUT";
-         overloadedCardIndex.value = null;
+         overloadedCardIndex.value = strikeTileIndex;
        }
 
-       // Flag high score achievements
+       // Flag achievements on run loss summary
        newAllTimeHigh.value = totalScore.value > highScore.value && totalScore.value > 0;
        newMouseHigh.value = isPureMouse.value && totalScore.value > mouseScore.value && totalScore.value > 0;
        newTouchHigh.value = isPureTouch.value && totalScore.value > touchScore.value && totalScore.value > 0;
+       newKeyboardHigh.value = isPureKeyboard.value && totalScore.value > keyboardScore.value && totalScore.value > 0;
+       newAimTapHigh.value = isPureAimTap.value && totalScore.value > aimTapScore.value && totalScore.value > 0;
 
-       // Save metrics to local storage
        if (newAllTimeHigh.value) highScore.value = totalScore.value;
        if (newMouseHigh.value) mouseScore.value = totalScore.value;
        if (newTouchHigh.value) touchScore.value = totalScore.value;
+       if (newKeyboardHigh.value) keyboardScore.value = totalScore.value;
+       if (newAimTapHigh.value) aimTapScore.value = totalScore.value;
 
-       // Enter intermediate board-freeze pause phase (lock interaction for 1s)
+       // Set summary-end track captures
+       endRunTrack.value = activeTrack.value;
+       if (endRunTrack.value === 'keyboard') {
+         endRunTrackRecord.value = keyboardScore.value;
+         endRunTrackIsNewHigh.value = newKeyboardHigh.value;
+         endRunTrackColor.value = '#58a6ff';
+       } else if (endRunTrack.value === 'mouse') {
+         endRunTrackRecord.value = mouseScore.value;
+         endRunTrackIsNewHigh.value = newMouseHigh.value;
+         endRunTrackColor.value = '#39d353';
+       } else if (endRunTrack.value === 'touch') {
+         endRunTrackRecord.value = touchScore.value;
+         endRunTrackIsNewHigh.value = newTouchHigh.value;
+         endRunTrackColor.value = '#a371f7';
+       } else if (endRunTrack.value === 'aim-tap') {
+         endRunTrackRecord.value = aimTapScore.value;
+         endRunTrackIsNewHigh.value = newAimTapHigh.value;
+         endRunTrackColor.value = '#a371f7';
+       } else {
+         endRunTrack.value = null;
+       }
+
        isFrozenOnLoss.value = true;
        isProceedReady.value = false;
        setTimeout(() => {
@@ -1075,8 +1268,14 @@ app.component("main-app", {
        }, 1000);
     };
 
-    const proceedToSummary = () => {
+    const proceedToSummary = (e) => {
+       if (e) {
+         e.preventDefault();
+         e.stopPropagation();
+       }
        if (!isProceedReady.value) return;
+       
+       lastTransitionTime = performance.now(); // Stamp the safety cooldown window
        isFrozenOnLoss.value = false;
        hasLost.value = true;
     };
@@ -1084,29 +1283,37 @@ app.component("main-app", {
     const clicked = (i, inputMethod) => {
       if (!isPlaying.value || hasLost.value || isFrozenOnLoss.value) return;
       
-      // Handle input pure tracking states
+      // Multi-input track isolation
       if (inputMethod === "mouse") {
         isPureTouch.value = false;
+        isPureKeyboard.value = false;
+        isPureAimTap.value = false;
       } else if (inputMethod === "touch") {
         isPureMouse.value = false;
+        isPureKeyboard.value = false;
+        isPureAimTap.value = false;
       } else if (inputMethod === "keyboard") {
         isPureMouse.value = false;
         isPureTouch.value = false;
+        isPureAimTap.value = false;
+      } else if (inputMethod === "aim-tap") {
+        isPureMouse.value = false;
+        isPureTouch.value = false;
+        isPureKeyboard.value = false;
       }
 
       const now = performance.now();
       const firstTargetIndex = targets.value.findIndex(x => x.index === i);
       
       if (firstTargetIndex >= 0) {
-        // Correct Hit Feedback
         const firstTarget = targets.value[firstTargetIndex];
         const rawScore = firstTarget.when + MAX_DELAY - performance.now();
         const scoreGain = Math.max(0, Math.floor(rawScore));
         
         if (scoreGain > 0) {
           totalScore.value += scoreGain;
+          runCorrectClicks.value++;
           
-          // Trigger subtle points popup element
           const floaterId = Date.now() + Math.random();
           scoreFloaters.value.push({
             id: floaterId,
@@ -1114,32 +1321,27 @@ app.component("main-app", {
             text: `+${scoreGain}`
           });
           
-          // Fast clear after exactly 150ms animation ends
           setTimeout(() => {
             scoreFloaters.value = scoreFloaters.value.filter(f => f.id !== floaterId);
           }, 150);
         }
         targets.value.splice(firstTargetIndex, 1);
       } else {
-        // Trigger red shaking card sequence on error
         shakingCards.value.add(i);
         setTimeout(() => {
           shakingCards.value.delete(i);
         }, 350);
 
-        // Record a physical strike instance into the first unoccupied slot
+        runTotalStrikes.value++;
+
         const freeSlotIdx = strikeSlots.value.findIndex(s => s === null);
         if (freeSlotIdx !== -1) {
           const strikeId = getId();
           const timestamp = performance.now();
           strikeSlots.value[freeSlotIdx] = { id: strikeId, timestamp };
           
-          // Cool down precisely that slot index when its timer expires
           setTimeout(() => {
-            // CRITICAL BUG FIX: If we've hit a freezeframe or game over summary state,
-            // immediately abort the cleanup timeout so that active strikes stay preserved visually on screen.
             if (isFrozenOnLoss.value || hasLost.value) return;
-            
             if (strikeSlots.value[freeSlotIdx] && strikeSlots.value[freeSlotIdx].id === strikeId) {
               strikeSlots.value[freeSlotIdx] = null;
             }
@@ -1147,7 +1349,7 @@ app.component("main-app", {
         }
         
         if (strikeSlots.value.filter(s => s !== null).length >= MAX_MISSES) {
-          handleLose('strike_limit');
+          handleLose('strike_limit', i);
         }
       }
     };
@@ -1155,7 +1357,6 @@ app.component("main-app", {
     const gameStartTime = Vue.ref(performance.now());
     const period = () => Math.floor(1000 * Math.pow(Math.E, -(performance.now() - gameStartTime.value) * Math.log(0.33333) / -60000));
     
-    // Period controller enabled computed property
     const isGameActive = Vue.computed(() => {
       return isPlaying.value && !hasLost.value && !isFrozenOnLoss.value;
     });
@@ -1177,14 +1378,26 @@ app.component("main-app", {
     });
 
     const startGame = () => {
-      // Clear game flags
+      // Guard against click/touch leaking within 200ms of transitioning screens
+      if (performance.now() - lastTransitionTime < 200) return;
+
       newAllTimeHigh.value = false;
       newMouseHigh.value = false;
       newTouchHigh.value = false;
+      newKeyboardHigh.value = false;
+      newAimTapHigh.value = false;
       detailedLostReason.value = "";
       overloadedCardIndex.value = null;
+      hoveredCardIndex.value = null;
 
-      // Initialize gameplay state loops
+      endRunTrack.value = null;
+      endRunTrackRecord.value = 0;
+      endRunTrackIsNewHigh.value = false;
+
+      runCorrectClicks.value = 0;
+      runTotalStrikes.value = 0;
+      runDurationSeconds.value = 0;
+
       gameStartTime.value = performance.now();
       targets.value = [];
       hasLost.value = false;
@@ -1194,10 +1407,12 @@ app.component("main-app", {
       strikeSlots.value = [null, null, null];
       isPureMouse.value = true;
       isPureTouch.value = true;
+      isPureKeyboard.value = true;
+      isPureAimTap.value = true;
       isPlaying.value = true;
     };
 
-    // Safely configure and bind key handlers inside setup()
+    // Numpad triggers mapped safely to Grid array indexes
     const codes = pipe([7, 8, 9, 4, 5, 6, 1, 2, 3], pipe.map(x => `Numpad${x}`), collect);
 
     for (const [keybind, i] of enumerate(codes)) {
@@ -1206,10 +1421,23 @@ app.component("main-app", {
       });
     }
 
+    // Aim-Tap inputs: Z and X physical keybindings
+    useKeybind("KeyZ", () => {
+      if (hoveredCardIndex.value !== null) {
+        clicked(hoveredCardIndex.value, "aim-tap");
+      }
+    });
+
+    useKeybind("KeyX", () => {
+      if (hoveredCardIndex.value !== null) {
+        clicked(hoveredCardIndex.value, "aim-tap");
+      }
+    });
+
     useKeybind("Space", () => {
       if (isFrozenOnLoss.value) {
         proceedToSummary();
-      } else if (!isPlaying.value || hasLost.value) {
+      } else if (hasLost.value || !isPlaying.value) {
         startGame();
       }
     });
@@ -1233,9 +1461,13 @@ app.component("main-app", {
       misses,
       mouseScore,
       touchScore,
+      keyboardScore,
+      aimTapScore,
       isPureMouse,
       isPureTouch,
-      currentInputType,
+      isPureKeyboard,
+      isPureAimTap,
+      activeTrack,
       handleLostClicked,
       shakingCards,
       scoreFloaters,
@@ -1243,10 +1475,22 @@ app.component("main-app", {
       newAllTimeHigh,
       newMouseHigh,
       newTouchHigh,
+      newKeyboardHigh,
+      newAimTapHigh,
       isStrikeActive,
       getStrokeOffset,
       overloadedCardIndex,
-      proceedToSummary
+      hoveredCardIndex,
+      proceedToSummary,
+      runCorrectClicks,
+      runTotalStrikes,
+      formattedTimeAlive,
+      freezeActionMessage,
+      // Record states for end of run track
+      endRunTrack,
+      endRunTrackRecord,
+      endRunTrackIsNewHigh,
+      endRunTrackColor
     }
   }
 });
