@@ -1,0 +1,1502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Grid Reflex // 9-Square</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+  
+  <!-- Load Vue first to ensure it is fully active before script execution -->
+  <script src="https://unpkg.com/vue@3"></script>
+
+  <style>
+    body {
+      margin: 0;
+      background: #0d1117;
+      color: #f0f6fc;
+      overscroll-behavior-y: contain;
+      font-family: 'Outfit', sans-serif;
+      overflow: hidden; /* Prevent body scrolling during rapid swipes */
+    }
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    html, body {
+      min-height: 100vh;
+      height: 100%;
+    }
+    .container {
+      max-width: 540px;
+      margin-left: auto;
+      margin-right: auto;
+      min-height: 100vh;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    .full-column {
+      display: flex;
+      flex-flow: column nowrap;
+      justify-content: center;
+      flex-grow: 1;
+    }
+    
+    /* --- Modern Neon Scoreboard --- */
+    .score-board {
+      background: rgba(22, 27, 34, 0.8);
+      border: 1px solid rgba(48, 54, 61, 0.8);
+      backdrop-filter: blur(8px);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 24px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .score-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .main-score-container {
+      display: flex;
+      flex-direction: column;
+    }
+    .label-mini {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #8b949e;
+    }
+    .score-prime {
+      font-size: 2.25rem;
+      font-weight: 800;
+      color: #58a6ff;
+      line-height: 1.1;
+    }
+    .stats-grid {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border-top: 1px solid rgba(48, 54, 61, 0.5);
+      padding-top: 12px;
+    }
+    .stat-box {
+      display: flex;
+      flex-direction: column;
+      min-height: 38px; /* Ensures layout stays aligned when empty */
+    }
+    .stat-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #c9d1d9;
+    }
+    
+    /* --- Interactive Strike Indicators --- */
+    .strike-indicator {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-top: 4px;
+    }
+    .strike-circle {
+      position: relative;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .strike-ring {
+      position: absolute;
+      top: 0;
+      left: 0;
+      transform: rotate(-90deg); /* Progress animation starts at 12 o'clock */
+    }
+    .strike-x {
+      position: absolute;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .active-tag {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      background: #39d353;
+      border-radius: 50%;
+      margin-left: 4px;
+      box-shadow: 0 0 8px #39d353;
+    }
+
+    /* --- Play Field Wrapper (Fixed alignment via negative margins) --- */
+    .grid-container-wrapper {
+      position: relative;
+      width: 100%;
+    }
+
+    /* --- Reflex Grid Space (Input & Playfield Optimized) --- */
+    .card-array {
+      display: grid;
+      gap: 0; /* Gapless grid to ensure continuous hitboxes */
+      grid-template-columns: repeat(3, 1fr);
+      width: calc(100% + 14px); /* Expands the layout width by exactly the 2x padding width */
+      margin-left: -7px; /* Shifts the visual tiles perfectly flush with the scoreboard edges */
+      margin-right: -7px;
+      aspect-ratio: 1 / 1;
+      touch-action: none; /* Block browser actions, pinch/pull-to-refresh on play board */
+    }
+    
+    /* Gapless outer hit detection wrapper */
+    .grid-cell {
+      width: 100%;
+      height: 100%;
+      padding: 7px; /* Creates the visual card separation mathematically halfway */
+      box-sizing: border-box;
+      cursor: pointer;
+      touch-action: none; /* Prevents scrolling / double tap zoom inside cells */
+    }
+
+    .card {
+      width: 100%;
+      height: 100%;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 14px;
+      position: relative;
+      overflow: hidden; /* Constrains points popups inside visual card boundaries */
+    }
+    .card--active {
+      background: rgba(88, 166, 255, 0.1);
+      border-color: #58a6ff;
+      box-shadow: inset 0 0 12px rgba(88, 166, 255, 0.2);
+    }
+    
+    /* --- Critical Failure Overload Pulsing --- */
+    @keyframes overloaded-glow {
+      0% { 
+        background: rgba(244, 63, 94, 0.15); 
+        border-color: #f43f5e; 
+        box-shadow: inset 0 0 16px rgba(244, 63, 94, 0.3), 0 0 8px rgba(244, 63, 94, 0.4); 
+      }
+      100% { 
+        background: rgba(244, 63, 94, 0.3); 
+        border-color: #ff7b72; 
+        box-shadow: inset 0 0 24px rgba(244, 63, 94, 0.5), 0 0 20px rgba(244, 63, 94, 0.8); 
+      }
+    }
+    .card--overloaded {
+      animation: overloaded-glow 0.8s infinite alternate ease-in-out !important;
+    }
+    
+    /* --- Strike Error Shake Animation --- */
+    @keyframes card-shake-red {
+      0%, 100% { transform: translateX(0); border-color: #30363d; }
+      20%, 60% { transform: translateX(-6px); border-color: #ff7b72; box-shadow: inset 0 0 8px rgba(255,123,114,0.3); }
+      40%, 80% { transform: translateX(6px); border-color: #ff7b72; box-shadow: inset 0 0 8px rgba(255,123,114,0.3); }
+    }
+    .card--shake {
+      animation: card-shake-red 0.35s ease-in-out forwards;
+    }
+
+    .card-overlay {
+      border-radius: 12px;
+      border: 2px solid #58a6ff;
+      box-shadow: 0 0 15px rgba(88, 166, 255, 0.4);
+      pointer-events: none;
+    }
+    .position-root {
+      position: relative;
+    }
+    .position-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+    }
+
+    /* --- Subtle & Fast Score Floaters (Top aligned, 150ms fade-out) --- */
+    @keyframes floater-drift {
+      0% { transform: translate(-50%, 0) scale(0.95); opacity: 0; }
+      20% { transform: translate(-50%, -4px) scale(1); opacity: 0.75; }
+      100% { transform: translate(-50%, -10px) scale(0.95); opacity: 0; }
+    }
+    .score-floater {
+      position: absolute;
+      left: 50%;
+      top: 12px; /* Located subtly at the top of the card */
+      transform: translateX(-50%);
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: #8b949e; /* Muted gray text color */
+      text-shadow: none; /* No neon glow */
+      pointer-events: none;
+      z-index: 10;
+      animation: floater-drift 0.15s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+    }
+
+    /* --- In-Game Failure Banner Overlay (Fades backdrop after 0.65s) --- */
+    @keyframes freeze-overlay-fade {
+      0%, 56.5% { /* 0.65s of 1.15s total timeline is roughly 56.5% */
+        background: rgba(13, 17, 23, 0.88);
+        backdrop-filter: blur(4px);
+      }
+      100% {
+        background: rgba(13, 17, 23, 0.35); /* Soft transparent tint to reveal grid clearly */
+        backdrop-filter: blur(0px); /* Sharp visual cards revealed */
+      }
+    }
+    .freeze-banner-overlay {
+      position: absolute;
+      top: 0;
+      left: -7px;
+      width: calc(100% + 14px);
+      height: 100%;
+      border-radius: 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+      box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.8);
+      animation: freeze-overlay-fade 1.15s forwards; /* Fades backdrop after 0.65s delay */
+      cursor: pointer;
+    }
+    @keyframes freeze-title-pop {
+      0% { transform: scale(0.85); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .freeze-title {
+      font-size: 2.75rem;
+      font-weight: 800;
+      color: #ff7b72;
+      letter-spacing: 0.05em;
+      text-shadow: 0 4px 12px rgba(0, 0, 0, 0.95), 0 0 30px rgba(255, 123, 114, 0.5);
+      animation: freeze-title-pop 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.2);
+    }
+    @keyframes prompt-pulse {
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 1; }
+    }
+    .freeze-sub {
+      font-size: 0.85rem;
+      color: #f0f6fc;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-top: 16px;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.95);
+      animation: prompt-pulse 1.5s infinite;
+    }
+
+    /* --- Interactive Game Menus (Start & Game Over Screens) --- */
+    .menu-overlay {
+      display: flex;
+      flex-flow: column nowrap;
+      justify-content: center;
+      align-items: center;
+      height: 100%;
+      background: rgba(13, 17, 23, 0.92);
+      backdrop-filter: blur(8px);
+      padding: 20px;
+    }
+    .menu-banner {
+      width: 100%;
+      max-width: 440px;
+      background: #161b22;
+      border: 2px solid #30363d;
+      border-radius: 24px;
+      padding: 36px 24px;
+      text-align: center;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+    }
+    
+    /* Lobby Screen Specific - Restored to classic Blue branding */
+    .lobby-banner {
+      border-color: #58a6ff;
+      box-shadow: 0 16px 48px rgba(88, 166, 255, 0.15);
+    }
+    .lobby-title {
+      font-size: 2.75rem;
+      font-weight: 800;
+      color: #58a6ff;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+    .lobby-subtitle {
+      font-size: 0.95rem;
+      color: #8b949e;
+      margin-bottom: 28px;
+    }
+    
+    /* Input Tracks List Section - Stays styled with premium purple */
+    .controls-panel {
+      background: rgba(22, 27, 34, 0.6);
+      border: 1px solid rgba(163, 113, 247, 0.3);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 28px;
+      text-align: left;
+    }
+    .controls-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: #a371f7;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 12px;
+      border-bottom: 1px solid rgba(163, 113, 247, 0.3);
+      padding-bottom: 6px;
+      text-align: center;
+    }
+    .controls-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 10px;
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #f0f6fc;
+    }
+    .controls-row:last-child {
+      margin-bottom: 0;
+    }
+
+    /* Lost Banner Specific */
+    .lost-banner {
+      border-color: #ff7b72;
+      box-shadow: 0 16px 48px rgba(255, 123, 114, 0.18);
+    }
+    .lost-banner--text {
+      font-size: 2rem;
+      font-weight: 800;
+      color: #ff7b72;
+      letter-spacing: -0.02em;
+    }
+    .lost-reason-badge {
+      display: inline-block;
+      background: rgba(255, 123, 114, 0.1);
+      border: 1px solid rgba(255, 123, 114, 0.3);
+      color: #ff7b72;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      font-weight: 700;
+      padding: 4px 14px;
+      border-radius: 20px;
+      margin-top: 10px;
+      margin-bottom: 12px;
+      letter-spacing: 0.08em;
+    }
+
+    /* --- Monotone Inline Run Stats --- */
+    .run-stats-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      gap: 18px;
+      margin-bottom: 24px;
+      padding: 10px;
+      background: rgba(22, 27, 34, 0.4);
+      border: 1px solid rgba(48, 54, 61, 0.3);
+      border-radius: 12px;
+    }
+    .run-stat-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #8b949e;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.9rem;
+    }
+    .run-stat-icon {
+      width: 16px;
+      height: 16px;
+      color: #8b949e;
+      display: inline-block;
+      vertical-align: middle;
+    }
+    .run-stat-value {
+      font-weight: 700;
+      color: #f0f6fc;
+    }
+    
+    /* Common Button Formatting */
+    .btn-action {
+      background: #238636;
+      color: #ffffff;
+      border: 1px solid rgba(240, 246, 252, 0.1);
+      border-radius: 12px;
+      padding: 12px 32px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      box-shadow: 0 4px 12px rgba(35, 134, 54, 0.3);
+      transition: background 0.15s, transform 0.1s, opacity 0.15s;
+    }
+    .btn-action:hover {
+      background: #2ea043;
+    }
+    .btn-action:active {
+      transform: scale(0.98);
+    }
+    
+    .restart-hint {
+      margin-top: 15px;
+      font-size: 0.8rem;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.85; }
+      50% { opacity: 1; }
+    }
+
+    @media (max-width: 400px) {
+      .score-prime { font-size: 1.8rem; }
+      .lobby-title { font-size: 2.2rem; }
+      .lost-banner--text { font-size: 2rem; }
+      .stat-val { font-size: 0.85rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- --- REALTIME CONSOLE OVERLAY FOR PREVIEW DIAGNOSTICS --- -->
+<div id="debug-err-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(20,0,0,0.95); color:#ff6b6b; z-index:999999; padding:20px; font-family:monospace; overflow-y:auto; box-sizing:border-box;">
+  <h3 style="margin-top:0; color:#fff; border-bottom:1px solid #ff6b6b; padding-bottom:10px;">⚠️ JavaScript Execution Error</h3>
+  <p id="debug-err-msg" style="font-weight:bold; font-size:1.1rem; color:#ffd2d2; margin-bottom:10px;"></p>
+  <pre id="debug-err-stack" style="background:#2a0505; padding:15px; border-radius:5px; border:1px solid #5a1010; white-space:pre-wrap; word-break:break-all;"></pre>
+  <button onclick="document.getElementById('debug-err-overlay').style.display='none'" style="background:#ff6b6b; color:#fff; border:none; padding:10px 20px; border-radius:4px; cursor:pointer; font-weight:bold;">Dismiss Overlay</button>
+</div>
+<script>
+  window.addEventListener('error', function(event) {
+    var overlay = document.getElementById('debug-err-overlay');
+    var msg = document.getElementById('debug-err-msg');
+    var stack = document.getElementById('debug-err-stack');
+    if (overlay && msg && stack) {
+      overlay.style.display = 'block';
+      msg.textContent = event.message + ' (at ' + event.filename + ':' + event.lineno + ':' + event.colno + ')';
+      stack.textContent = event.error && event.error.stack ? event.error.stack : 'No stack trace available.';
+    }
+  });
+  window.addEventListener('unhandledrejection', function(event) {
+    var overlay = document.getElementById('debug-err-overlay');
+    var msg = document.getElementById('debug-err-msg');
+    var stack = document.getElementById('debug-err-stack');
+    if (overlay && msg && stack) {
+      overlay.style.display = 'block';
+      msg.textContent = 'Unhandled Promise Rejection: ' + event.reason;
+      stack.textContent = event.reason && event.reason.stack ? event.reason.stack : String(event.reason);
+    }
+  });
+</script>
+
+<div id="app">
+  <main-app></main-app>
+</div>
+
+<script>
+// --- Polyfills and Prototypes ---
+Array.prototype.remove = function (el) {
+  const index = this.indexOf(el)
+  if (index >= 0) {
+    this.splice(index, 1)
+  }
+}
+Array.prototype.count = function (predicate = () => true) {
+  return this.reduce((result, item, index) => {
+    if (predicate(item, index, this)) { return result + 1 }
+    else { return result }
+  }, 0)
+}
+Object.defineProperties(Array.prototype, {
+  last: {
+    get () { return this[this.length - 1] },
+    set (newValue) {
+      if (this.length <= 0) throw new Error('cannot overwrite last value of empty array')
+      this[this.length - 1] = newValue
+    }
+  }
+})
+
+// --- Utility Functions ---
+function pipe(init, ...fs) {
+  return fs.reduce((curr, f) => f(curr), init)
+}
+pipe.it = Symbol('pipe.it')
+pipe.bound = (f, ...args) => {
+  return it => {
+    const realArgs = args.map(x => x === pipe.it ? it : x)
+    return f(...realArgs)
+  }
+}
+const pipeWrap = f => (...args) => x => f(x, ...args)
+pipe.map = pipeWrap(map)
+
+function *range (...args) {
+  let lo = 0, hi, step = 1
+  if (args.length === 1) {
+    [hi] = args
+  } else {
+    [lo, hi, step = step] = args
+  }
+  let curr = lo
+  while ((hi - curr) / step > 0) {
+    yield curr
+    curr += step
+  }
+}
+function *map (iterable, mapper) {
+  let i = 0
+  for (const x of iterable) {
+    yield mapper(x, i)
+    i++
+  }
+}
+function collect (iterable) {
+  return Array.from(iterable)
+}
+function *enumerate (iterable) {
+  let i = 0
+  for (const x of iterable) {
+    yield [x, i]
+    i++
+  }
+}
+function randomInt (lo, hi, step = 1) {
+  return Math.floor(Math.random() * (hi - lo) / step) * step + lo
+}
+function useEventHandler (target, eventType, handler) {
+  Vue.onMounted(() => { target.addEventListener(eventType, handler) })
+  Vue.onBeforeUnmount(() => { target.removeEventListener(eventType, handler) })
+}
+function useComputedStorage (key, initialValue, storage = localStorage, transform = JSON) {
+  let value = storage.getItem(key)
+  if (value == null) {
+    value = initialValue
+  } else {
+    value = transform.parse(value)
+  }
+  const _valueRef = Vue.ref(value)
+  const valueRef = Vue.computed({
+    get: () => _valueRef.value,
+    set: (newValue) => {
+      _valueRef.value = newValue
+      storage.setItem(key, transform.stringify(_valueRef.value))
+    },
+  })
+  useEventHandler(window, 'storage', (event) => {
+    if (event.storageArea === storage && event.key === key) {
+      valueRef.value = transform.parse(event.newValue)
+    }
+  })
+  return valueRef
+}
+
+function not(ref) {
+  return Vue.computed(() => !ref.value)
+}
+
+// Fixed timing systems
+function usePeriodic (effect, _getPeriod, enabledRef, debug) {
+  let timeoutId = null
+  const getPeriod = () => {
+    const value = _getPeriod()
+    if (debug) console.log(value)
+    return value
+  }
+  function update () {
+    if (enabledRef.value) {
+      timeoutId = setTimeout(() => {
+        effect()
+        update()
+      }, getPeriod())
+    } else {
+      timeoutId = null
+    }
+  }
+  update()
+  Vue.watch(enabledRef, (isEnabled, wasEnabled) => {
+    if (isEnabled && !wasEnabled && timeoutId === null) {
+      update()
+    }
+    if (wasEnabled && !isEnabled && timeoutId !== null) {
+      clearTimeout(timeoutId)
+      timeoutId = null
+    }
+  })
+  Vue.onUnmounted(() => {
+    clearTimeout(timeoutId)
+  })
+}
+
+class DefaultMap extends Map {
+  constructor (defaultComputer, ...args) {
+    super(...args)
+    this.defaultComputer = defaultComputer
+  }
+  get (key) {
+    if (!this.has(key)) {
+      this.set(key, this.defaultComputer(key))
+    }
+    return super.get(key)
+  }
+}
+
+class ListMap extends DefaultMap {
+  constructor (...args) {
+    super(() => [], ...args)
+  }
+}
+
+const { useKeybind } = function () {
+  const registrations = new ListMap()
+  function handler (event) {
+    registrations.get(event.code).forEach(h => { h() })   
+  }
+  document.addEventListener("keydown", handler)
+  function useKeybind (keycode, handler) {
+    function uniqueHandler () { handler() }
+    registrations.get(keycode).push(uniqueHandler)
+    Vue.onUnmounted(() => {
+      registrations.get(keycode).remove(uniqueHandler)
+    })
+  }
+  return { useKeybind }
+}()
+
+const { nowRef } = function () {
+  const nowRef = Vue.ref(performance.now())
+  function update () {
+    setTimeout(() => {
+      nowRef.value = performance.now()
+      update()
+    }, 50)
+  }
+  update()
+  return { nowRef }
+}()
+</script>
+
+<!-- Vue Component Templates -->
+<script type="text/html" id="my-card-overlay">
+  <div ref="el" class="card-overlay position-overlay"></div>
+</script>
+
+<script type="text/html" id="my-card">
+  <!-- Gapless, non-rounded wrapper for absolute hitbox coverage -->
+  <div class="grid-cell" @mousedown="onMouseDown" @touchstart="onTouchStart">
+    <div class="card position-root" :class="classes">
+      <!-- Overlay Shrinking Targets -->
+      <template v-for="target of targets" :key="target.id">
+        <my-card-overlay :is-frozen="isFrozen"></my-card-overlay>
+      </template>
+      
+      <!-- Localized Muted Points Floating Indicators (Top aligned, 150ms fade-out) -->
+      <div v-for="floater in floaters" :key="floater.id" class="score-floater">
+        {{ floater.text }}
+      </div>
+    </div>
+  </div>
+</script>
+
+<script type="text/html" id="main-app">
+  <div class="container">
+    <div class="full-column position-root">
+      
+      <!-- Modern Interactive Scoreboard Panel -->
+      <div class="score-board">
+        <div class="score-row">
+          <div class="main-score-container">
+            <span class="label-mini" style="display: flex; align-items: center; gap: 6px;">
+              Current Run
+              <!-- Dynamic Header Track Icon Indicator -->
+              <span v-if="activeTrack" style="display: inline-flex; align-items: center;">
+                <template v-if="activeTrack === 'keyboard'">
+                  <svg class="run-stat-icon" style="color: #58a6ff; width: 12px; height: 12px;" viewBox="0 0 24 24" fill="currentColor">
+                    <rect x="2" y="2" width="5" height="5" rx="1"/>
+                    <rect x="9.5" y="2" width="5" height="5" rx="1"/>
+                    <rect x="17" y="2" width="5" height="5" rx="1"/>
+                    <rect x="2" y="9.5" width="5" height="5" rx="1"/>
+                    <rect x="9.5" y="9.5" width="5" height="5" rx="1"/>
+                    <rect x="17" y="9.5" width="5" height="5" rx="1"/>
+                    <rect x="2" y="17" width="5" height="5" rx="1"/>
+                    <rect x="9.5" y="17" width="5" height="5" rx="1"/>
+                    <rect x="17" y="17" width="5" height="5" rx="1"/>
+                  </svg>
+                </template>
+                <template v-else-if="activeTrack === 'mouse'">
+                  <svg class="run-stat-icon" style="color: #39d353; width: 12px; height: 12px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="5" y="2" width="14" height="20" rx="7"/>
+                    <path d="M12 2v6"/>
+                    <path d="M5 10h14"/>
+                  </svg>
+                </template>
+                <template v-else-if="activeTrack === 'touch'">
+                  <svg class="run-stat-icon" style="color: #a371f7; width: 12px; height: 12px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 11V4a2 2 0 0 1 4 0v7"/>
+                    <path d="M8 13V8.5a1.5 1.5 0 0 1 3 0V11"/>
+                    <path d="M16 11.5V10a1.5 1.5 0 0 1 3 0v4.5a6 6 0 0 1-6 6h-2a6 6 0 0 1-6-6V13a1.5 1.5 0 0 1 3 0V13"/>
+                  </svg>
+                </template>
+                <template v-else-if="activeTrack === 'aim-tap'">
+                  <svg class="run-stat-icon" style="color: #a371f7; width: 12px; height: 12px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="7" />
+                    <line x1="12" y1="1" x2="12" y2="5" />
+                    <line x1="12" y1="19" x2="12" y2="23" />
+                    <line x1="1" y1="12" x2="5" y2="12" />
+                    <line x1="19" y1="12" x2="23" y2="12" />
+                    <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+                  </svg>
+                </template>
+              </span>
+            </span>
+            <span class="score-prime">{{ totalScore }}</span>
+          </div>
+          <div class="main-score-container" style="text-align: right;">
+            <span class="label-mini">All-Time High</span>
+            <span class="score-prime" style="color: #ffd33d;">{{ highScore }}</span>
+          </div>
+        </div>
+        
+        <!-- Streamlined Stats Block with Centered Strikes Indicator -->
+        <div class="stats-grid">
+          <div class="stat-box" style="align-items: center;">
+            <span class="label-mini">Strikes</span>
+            <div class="strike-indicator">
+              <div v-for="idx in [0, 1, 2]" :key="idx" class="strike-circle">
+                <svg class="strike-ring" width="32" height="32" viewBox="0 0 32 32">
+                  <circle cx="16" cy="16" r="12" fill="none" stroke="#30363d" stroke-width="2" />
+                  <template v-if="isStrikeActive(idx)">
+                    <circle cx="16" cy="16" r="9" fill="#ff7b72" />
+                    <circle 
+                      cx="16" 
+                      cy="16" 
+                      r="12" 
+                      fill="none" 
+                      stroke="#ff7b72" 
+                      stroke-width="2.5" 
+                      stroke-linecap="round"
+                      stroke-dasharray="75.4" 
+                      :stroke-dashoffset="getStrokeOffset(idx)" 
+                    />
+                  </template>
+                </svg>
+                <div class="strike-x" v-if="isStrikeActive(idx)">
+                  <svg width="10" height="10" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M2 2L10 10M10 2L2 10" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Play Field Wrapper Container -->
+      <div class="grid-container-wrapper">
+        <div class="card-array">
+          <template v-for="i of cards">
+            <my-card 
+              :targets="targetsById.get(i)" 
+              :floaters="scoreFloaters.filter(f => f.cardIndex === i)"
+              :shaking="shakingCards.has(i)"
+              :is-overloaded="overloadedCardIndex === i"
+              :is-frozen="isFrozenOnLoss"
+              @click-action="clicked(i, $event)"
+              @mouseenter="hoveredCardIndex = i"
+              @mouseleave="hoveredCardIndex = null"
+              :code="codes[i]">
+            </my-card>
+          </template>
+        </div>
+
+        <!-- FREEZE INTERMISSION SCREEN -->
+        <div 
+          v-if="isFrozenOnLoss" 
+          class="freeze-banner-overlay" 
+          @click.stop.prevent="proceedToSummary"
+          @touchstart.stop.prevent="proceedToSummary"
+        >
+          <div class="freeze-title">{{ detailedLostReason }}</div>
+          <div class="freeze-sub" v-if="isProceedReady">{{ freezeActionMessage }}</div>
+          <div class="freeze-sub" v-else style="opacity: 0.5;">Analyzing Fault...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- START LOBBY SCREEN -->
+    <div v-if="!isPlaying && !hasLost && !isFrozenOnLoss" class="position-overlay menu-overlay">
+      <div class="menu-banner lobby-banner">
+        <div class="lobby-title">GRID REFLEX</div>
+        <div class="lobby-subtitle">Arcade Reaction & Speed Testing Unit</div>
+        
+        <!-- Streamlined Input Tracks Setup Guide (Purple Accents Only) -->
+        <div class="controls-panel">
+          <div class="controls-title">Input Tracks</div>
+          
+          <!-- Mouse Track -->
+          <div class="controls-row">
+            <svg class="run-stat-icon" style="color: #a371f7; width: 18px; height: 18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="5" y="2" width="14" height="20" rx="7"/>
+              <path d="M12 2v6"/>
+              <path d="M5 10h14"/>
+            </svg>
+            <span style="color: #a371f7; font-weight: 700;">Mouse</span>
+          </div>
+          
+          <!-- Touch Track -->
+          <div class="controls-row">
+            <svg class="run-stat-icon" style="color: #a371f7; width: 18px; height: 18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 11V4a2 2 0 0 1 4 0v7"/>
+              <path d="M8 13V8.5a1.5 1.5 0 0 1 3 0V11"/>
+              <path d="M16 11.5V10a1.5 1.5 0 0 1 3 0v4.5a6 6 0 0 1-6 6h-2a6 6 0 0 1-6-6V13a1.5 1.5 0 0 1 3 0V13"/>
+            </svg>
+            <span style="color: #a371f7; font-weight: 700;">Touch</span>
+          </div>
+          
+          <!-- Keyboard Track -->
+          <div class="controls-row">
+            <svg class="run-stat-icon" style="color: #a371f7; width: 18px; height: 18px;" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="2" y="2" width="5" height="5" rx="1"/>
+              <rect x="9.5" y="2" width="5" height="5" rx="1"/>
+              <rect x="17" y="2" width="5" height="5" rx="1"/>
+              <rect x="2" y="9.5" width="5" height="5" rx="1"/>
+              <rect x="9.5" y="9.5" width="5" height="5" rx="1"/>
+              <rect x="17" y="9.5" width="5" height="5" rx="1"/>
+              <rect x="2" y="17" width="5" height="5" rx="1"/>
+              <rect x="9.5" y="17" width="5" height="5" rx="1"/>
+              <rect x="17" y="17" width="5" height="5" rx="1"/>
+            </svg>
+            <span style="color: #a371f7; font-weight: 700;">Keyboard</span>
+          </div>
+
+          <!-- Aim-Tap Track -->
+          <div class="controls-row">
+            <svg class="run-stat-icon" style="color: #a371f7; width: 18px; height: 18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="7" />
+              <line x1="12" y1="1" x2="12" y2="5" />
+              <line x1="12" y1="19" x2="12" y2="23" />
+              <line x1="1" y1="12" x2="5" y2="12" />
+              <line x1="19" y1="12" x2="23" y2="12" />
+              <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+            </svg>
+            <span style="color: #a371f7; font-weight: 700;">Aim-Tap</span>
+          </div>
+        </div>
+
+        <button class="btn-action" @click="startGame">START MISSION</button>
+        <div class="restart-hint">Press Space to Launch</div>
+      </div>
+    </div>
+
+    <!-- LOSS / SUMMARY SCREEN MODAL -->
+    <div v-if="hasLost" class="position-overlay menu-overlay">
+      <div class="menu-banner lost-banner">
+        <div class="lost-banner--text">Run Ended</div>
+        <div class="lost-reason-badge">{{ detailedLostReason }}</div>
+        
+        <!-- Large Score Display Section -->
+        <div style="margin: 20px 0;">
+          <div class="label-mini" :style="{ color: newAllTimeHigh ? '#ffd33d' : '#58a6ff' }" style="font-size: 0.9rem; font-weight: 800; letter-spacing: 0.15em;">
+            {{ newAllTimeHigh ? 'NEW HIGH SCORE' : 'SCORE' }}
+          </div>
+          <div :style="{ color: newAllTimeHigh ? '#ffd33d' : '#58a6ff' }" style="font-size: 4.5rem; font-weight: 800; line-height: 1.1; font-family: 'Outfit', sans-serif;">
+            {{ totalScore }}
+          </div>
+        </div>
+
+        <!-- Inline Run Statistics Block -->
+        <div class="run-stats-row">
+          <!-- Stopwatch Icon: Time Alive -->
+          <div class="run-stat-item" title="Total Time Alive">
+            <svg class="run-stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="13" r="8"/>
+              <path d="M12 5V1"/>
+              <path d="M10 1h4"/>
+              <path d="M12 9v4l2.5 1.5"/>
+            </svg>
+            <span class="run-stat-value">{{ formattedTimeAlive }}s</span>
+          </div>
+
+          <!-- Target Icon: Correctly Cleared Tiles -->
+          <div class="run-stat-item" title="Correctly Cleared Tiles">
+            <svg class="run-stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <circle cx="12" cy="12" r="6"/>
+              <circle cx="12" cy="12" r="2"/>
+            </svg>
+            <span class="run-stat-value">{{ runCorrectClicks }}</span>
+          </div>
+
+          <!-- Circular X Cutout Icon: Total Strikes Logged -->
+          <div class="run-stat-item" title="Total Run Strikes Logged">
+            <svg class="run-stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M15 9l-6 6"/>
+              <path d="M9 9l6 6"/>
+            </svg>
+            <span class="run-stat-value">{{ runTotalStrikes }}</span>
+          </div>
+        </div>
+
+        <!-- Input Track Score Section (Displayed only if run completed on a single input track) -->
+        <div v-if="endRunTrack" style="margin: 16px 0; padding: 12px; background: rgba(22, 27, 34, 0.5); border: 1px solid rgba(48, 54, 61, 0.4); border-radius: 12px; text-align: center;">
+          <div class="label-mini" style="font-size: 0.75rem; letter-spacing: 0.1em; color: #8b949e; margin-bottom: 6px;">
+            TRACK RECORD
+          </div>
+          <div style="display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700;">
+            <span :style="{ color: endRunTrackColor }" style="font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
+               <template v-if="endRunTrack === 'keyboard'">
+                 <svg class="run-stat-icon" style="color: #58a6ff; width: 16px; height: 16px;" viewBox="0 0 24 24" fill="currentColor">
+                   <rect x="2" y="2" width="5" height="5" rx="1"/>
+                   <rect x="9.5" y="2" width="5" height="5" rx="1"/>
+                   <rect x="17" y="2" width="5" height="5" rx="1"/>
+                   <rect x="2" y="9.5" width="5" height="5" rx="1"/>
+                   <rect x="9.5" y="9.5" width="5" height="5" rx="1"/>
+                   <rect x="17" y="9.5" width="5" height="5" rx="1"/>
+                   <rect x="2" y="17" width="5" height="5" rx="1"/>
+                   <rect x="9.5" y="17" width="5" height="5" rx="1"/>
+                   <rect x="17" y="17" width="5" height="5" rx="1"/>
+                 </svg>
+               </template>
+               <template v-else-if="endRunTrack === 'mouse'">
+                 <svg class="run-stat-icon" style="color: #39d353; width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                   <rect x="5" y="2" width="14" height="20" rx="7"/>
+                   <path d="M12 2v6"/>
+                   <path d="M5 10h14"/>
+                 </svg>
+               </template>
+               <template v-else-if="endRunTrack === 'touch'">
+                 <svg class="run-stat-icon" style="color: #a371f7; width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                   <path d="M12 11V4a2 2 0 0 1 4 0v7"/>
+                   <path d="M8 13V8.5a1.5 1.5 0 0 1 3 0V11"/>
+                   <path d="M16 11.5V10a1.5 1.5 0 0 1 3 0v4.5a6 6 0 0 1-6 6h-2a6 6 0 0 1-6-6V13a1.5 1.5 0 0 1 3 0V13"/>
+                 </svg>
+               </template>
+               <template v-else-if="endRunTrack === 'aim-tap'">
+                 <svg class="run-stat-icon" style="color: #a371f7; width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                   <circle cx="12" cy="12" r="7" />
+                   <line x1="12" y1="1" x2="12" y2="5" />
+                   <line x1="12" y1="19" x2="12" y2="23" />
+                   <line x1="1" y1="12" x2="5" y2="12" />
+                   <line x1="19" y1="12" x2="23" y2="12" />
+                   <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+                 </svg>
+               </template>
+
+               <template v-if="endRunTrackIsNewHigh">
+                 New High-Score
+               </template>
+               <template v-else>
+                 High-Score: <span style="color: #f0f6fc; font-family: 'JetBrains Mono', monospace; margin-left: 4px;">{{ endRunTrackRecord }}</span>
+               </template>
+            </span>
+          </div>
+        </div>
+
+        <!-- Try Again Button (Protected by transition cooldown) -->
+        <button class="btn-action" @click="startGame">
+          TRY AGAIN
+        </button>
+        <div class="restart-hint">Press Space to Quick Reset</div>
+      </div>
+    </div>
+  </div>
+</script>
+
+<!-- Vue Component Logic Definitions -->
+<script>
+const app = Vue.createApp({});
+
+const MAX_DELAY = 1000;
+const MISS_DELAY = 5000;
+const MAX_MISSES = 3;
+
+app.component("my-card-overlay", {
+  template: "#my-card-overlay",
+  props: {
+    isFrozen: Boolean
+  },
+  setup (props) {
+    const el = Vue.ref(null);
+    let animationInstance = null;
+    
+    Vue.onMounted(() => {
+      if (el.value && el.value.animate) {
+        animationInstance = el.value.animate([
+          { top: '50%', left: '50%', bottom: '50%', right: '50%', opacity: 1 },
+          { top: '0', left: '0', bottom: '0', right: '0', opacity: 0.25 },
+        ], {
+          duration: MAX_DELAY,
+          iterations: 1, 
+          fill: 'forwards'
+        });
+        
+        if (props.isFrozen) {
+          animationInstance.pause();
+        }
+      }
+    });
+
+    Vue.watch(() => props.isFrozen, (newVal) => {
+      if (animationInstance) {
+        if (newVal) {
+          animationInstance.pause();
+        } else {
+          animationInstance.play();
+        }
+      }
+    });
+
+    return { el };
+  }
+});
+
+app.component("my-card", {
+  template: "#my-card",
+  props: {
+    targets: Array,
+    floaters: Array,
+    shaking: Boolean,
+    isOverloaded: Boolean,
+    isFrozen: Boolean
+  },
+  emits: ["click-action"],
+  setup (props, { emit }) {
+    const { targets, shaking, isOverloaded, isFrozen } = Vue.toRefs(props);
+    const isActiveTarget = Vue.computed(() => {
+      return targets.value.some(x => true);
+    });
+    const classes = Vue.computed(() => {
+      return { 
+        "card--active": isActiveTarget.value,
+        "card--shake": shaking && shaking.value,
+        "card--overloaded": isOverloaded && isOverloaded.value
+      };
+    });
+    const onMouseDown = (event) => {
+      if (event.button !== 0) return;
+      emit("click-action", "mouse");
+    };
+    const onTouchStart = (event) => {
+      event.preventDefault();
+      emit("click-action", "touch");
+    };
+    return { classes, onMouseDown, onTouchStart, isFrozen };
+  }
+});
+
+app.component("main-app", {
+  template: "#main-app",
+  setup () {
+    const getId = (() => {
+      let currId = 0;
+      return () => currId++;
+    })();
+    const cards = pipe(9, range, collect);
+    const targets = Vue.ref([]);
+    const totalScore = Vue.ref(0);
+    
+    // Core game flow controllers
+    const isPlaying = Vue.ref(false);
+    const isFrozenOnLoss = Vue.ref(false);
+    const isProceedReady = Vue.ref(false);
+    const hasLost = Vue.ref(false);
+    
+    let lostTime = null;
+    let lastTransitionTime = 0; // Cooldown shield timestamp
+
+    // Run metrics state references
+    const runCorrectClicks = Vue.ref(0);
+    const runTotalStrikes = Vue.ref(0);
+    const runDurationSeconds = Vue.ref(0);
+
+    // Track active strike slot states directly to prevent slot "jumping"
+    const strikeSlots = Vue.ref([null, null, null]); 
+    const misses = Vue.computed(() => strikeSlots.value.filter(s => s !== null).length);
+    
+    // Live feedback animation structures
+    const shakingCards = Vue.ref(new Set());
+    const scoreFloaters = Vue.ref([]);
+    const overloadedCardIndex = Vue.ref(null);
+    const hoveredCardIndex = Vue.ref(null); // Aim-Tap target tracker
+
+    // Run failure analytics
+    const detailedLostReason = Vue.ref("");
+    const newAllTimeHigh = Vue.ref(false);
+    const newMouseHigh = Vue.ref(false);
+    const newTouchHigh = Vue.ref(false);
+    const newKeyboardHigh = Vue.ref(false);
+    const newAimTapHigh = Vue.ref(false);
+
+    // Pure input tracking status flags
+    const isPureMouse = Vue.ref(true);
+    const isPureTouch = Vue.ref(true);
+    const isPureKeyboard = Vue.ref(true);
+    const isPureAimTap = Vue.ref(true);
+
+    // Run-end track metadata
+    const endRunTrack = Vue.ref(null);
+    const endRunTrackRecord = Vue.ref(0);
+    const endRunTrackIsNewHigh = Vue.ref(false);
+    const endRunTrackColor = Vue.ref("#58a6ff");
+
+    const highScore = useComputedStorage('v2-ominous-all', 0);
+    const mouseScore = useComputedStorage('v2-outrageous-mouse', 0);
+    const touchScore = useComputedStorage('v2-outstanding-touch', 0);
+    const keyboardScore = useComputedStorage('v2-outstanding-keyboard', 0);
+    const aimTapScore = useComputedStorage('v2-outstanding-aim-tap', 0);
+
+    // Completely generic, inclusive continuation text instruction
+    const freezeActionMessage = Vue.computed(() => {
+      return 'Tap, click, or press Space to continue';
+    });
+
+    // Determines active pure qualifying track (At start/all-true or mixed, returns null)
+    const activeTrack = Vue.computed(() => {
+      const activeCount = [isPureMouse.value, isPureTouch.value, isPureKeyboard.value, isPureAimTap.value].filter(Boolean).length;
+      if (activeCount === 1) {
+        if (isPureMouse.value) return 'mouse';
+        if (isPureTouch.value) return 'touch';
+        if (isPureKeyboard.value) return 'keyboard';
+        if (isPureAimTap.value) return 'aim-tap';
+      }
+      return null;
+    });
+
+    const formattedTimeAlive = Vue.computed(() => {
+      return runDurationSeconds.value.toFixed(1);
+    });
+
+    const targetsById = Vue.computed(() => {
+      const map = new Map();
+      cards.forEach(i => { map.set(i, []) });
+      for (const t of targets.value) {
+        map.get(t.index).push(t);
+      }
+      return map;
+    });
+
+    const isStrikeActive = (idx) => {
+      return strikeSlots.value[idx] !== null;
+    };
+
+    const getStrokeOffset = (idx) => {
+      const strike = strikeSlots.value[idx];
+      if (!strike) return 75.4;
+      
+      const refTime = (isFrozenOnLoss.value || hasLost.value) ? lostTime : nowRef.value;
+      const elapsed = refTime - strike.timestamp;
+      const remaining = Math.max(0, MISS_DELAY - elapsed);
+      const ratio = remaining / MISS_DELAY;
+      return 75.4 * (1 - ratio);
+    };
+
+    const handleLose = (reason, strikeTileIndex = null) => {
+       isPlaying.value = false;
+       lostTime = performance.now();
+       
+       runDurationSeconds.value = Math.max(0, (lostTime - gameStartTime.value) / 1000);
+
+       if (reason === 'expired') {
+         detailedLostReason.value = "OVERLOADED";
+         if (targets.value.length > 0) {
+           const oldest = targets.value.reduce((min, t) => t.when < min.when ? t : min, targets.value[0]);
+           overloadedCardIndex.value = oldest ? oldest.index : null;
+         }
+       } else {
+         detailedLostReason.value = "STRIKE-OUT";
+         overloadedCardIndex.value = strikeTileIndex;
+       }
+
+       // Flag achievements on run loss summary
+       newAllTimeHigh.value = totalScore.value > highScore.value && totalScore.value > 0;
+       newMouseHigh.value = isPureMouse.value && totalScore.value > mouseScore.value && totalScore.value > 0;
+       newTouchHigh.value = isPureTouch.value && totalScore.value > touchScore.value && totalScore.value > 0;
+       newKeyboardHigh.value = isPureKeyboard.value && totalScore.value > keyboardScore.value && totalScore.value > 0;
+       newAimTapHigh.value = isPureAimTap.value && totalScore.value > aimTapScore.value && totalScore.value > 0;
+
+       if (newAllTimeHigh.value) highScore.value = totalScore.value;
+       if (newMouseHigh.value) mouseScore.value = totalScore.value;
+       if (newTouchHigh.value) touchScore.value = totalScore.value;
+       if (newKeyboardHigh.value) keyboardScore.value = totalScore.value;
+       if (newAimTapHigh.value) aimTapScore.value = totalScore.value;
+
+       // Set summary-end track captures
+       endRunTrack.value = activeTrack.value;
+       if (endRunTrack.value === 'keyboard') {
+         endRunTrackRecord.value = keyboardScore.value;
+         endRunTrackIsNewHigh.value = newKeyboardHigh.value;
+         endRunTrackColor.value = '#58a6ff';
+       } else if (endRunTrack.value === 'mouse') {
+         endRunTrackRecord.value = mouseScore.value;
+         endRunTrackIsNewHigh.value = newMouseHigh.value;
+         endRunTrackColor.value = '#39d353';
+       } else if (endRunTrack.value === 'touch') {
+         endRunTrackRecord.value = touchScore.value;
+         endRunTrackIsNewHigh.value = newTouchHigh.value;
+         endRunTrackColor.value = '#a371f7';
+       } else if (endRunTrack.value === 'aim-tap') {
+         endRunTrackRecord.value = aimTapScore.value;
+         endRunTrackIsNewHigh.value = newAimTapHigh.value;
+         endRunTrackColor.value = '#a371f7';
+       } else {
+         endRunTrack.value = null;
+       }
+
+       isFrozenOnLoss.value = true;
+       isProceedReady.value = false;
+       setTimeout(() => {
+         isProceedReady.value = true;
+       }, 1000);
+    };
+
+    const proceedToSummary = (e) => {
+       if (e) {
+         e.preventDefault();
+         e.stopPropagation();
+       }
+       if (!isProceedReady.value) return;
+       
+       lastTransitionTime = performance.now(); // Stamp the safety cooldown window
+       isFrozenOnLoss.value = false;
+       hasLost.value = true;
+    };
+
+    const clicked = (i, inputMethod) => {
+      if (!isPlaying.value || hasLost.value || isFrozenOnLoss.value) return;
+      
+      // Multi-input track isolation
+      if (inputMethod === "mouse") {
+        isPureTouch.value = false;
+        isPureKeyboard.value = false;
+        isPureAimTap.value = false;
+      } else if (inputMethod === "touch") {
+        isPureMouse.value = false;
+        isPureKeyboard.value = false;
+        isPureAimTap.value = false;
+      } else if (inputMethod === "keyboard") {
+        isPureMouse.value = false;
+        isPureTouch.value = false;
+        isPureAimTap.value = false;
+      } else if (inputMethod === "aim-tap") {
+        isPureMouse.value = false;
+        isPureTouch.value = false;
+        isPureKeyboard.value = false;
+      }
+
+      const now = performance.now();
+      const firstTargetIndex = targets.value.findIndex(x => x.index === i);
+      
+      if (firstTargetIndex >= 0) {
+        const firstTarget = targets.value[firstTargetIndex];
+        const rawScore = firstTarget.when + MAX_DELAY - performance.now();
+        const scoreGain = Math.max(0, Math.floor(rawScore));
+        
+        if (scoreGain > 0) {
+          totalScore.value += scoreGain;
+          runCorrectClicks.value++;
+          
+          const floaterId = Date.now() + Math.random();
+          scoreFloaters.value.push({
+            id: floaterId,
+            cardIndex: i,
+            text: `+${scoreGain}`
+          });
+          
+          setTimeout(() => {
+            scoreFloaters.value = scoreFloaters.value.filter(f => f.id !== floaterId);
+          }, 150);
+        }
+        targets.value.splice(firstTargetIndex, 1);
+      } else {
+        shakingCards.value.add(i);
+        setTimeout(() => {
+          shakingCards.value.delete(i);
+        }, 350);
+
+        runTotalStrikes.value++;
+
+        const freeSlotIdx = strikeSlots.value.findIndex(s => s === null);
+        if (freeSlotIdx !== -1) {
+          const strikeId = getId();
+          const timestamp = performance.now();
+          strikeSlots.value[freeSlotIdx] = { id: strikeId, timestamp };
+          
+          setTimeout(() => {
+            if (isFrozenOnLoss.value || hasLost.value) return;
+            if (strikeSlots.value[freeSlotIdx] && strikeSlots.value[freeSlotIdx].id === strikeId) {
+              strikeSlots.value[freeSlotIdx] = null;
+            }
+          }, MISS_DELAY);
+        }
+        
+        if (strikeSlots.value.filter(s => s !== null).length >= MAX_MISSES) {
+          handleLose('strike_limit', i);
+        }
+      }
+    };
+
+    const gameStartTime = Vue.ref(performance.now());
+    const period = () => Math.floor(1000 * Math.pow(Math.E, -(performance.now() - gameStartTime.value) * Math.log(0.33333) / -60000));
+    
+    const isGameActive = Vue.computed(() => {
+      return isPlaying.value && !hasLost.value && !isFrozenOnLoss.value;
+    });
+
+    usePeriodic(function () {
+      if (isPlaying.value && !hasLost.value && !isFrozenOnLoss.value) { 
+        targets.value.push({ id: getId(), index: randomInt(0, 9), when: performance.now() }); 
+      }
+    }, period, isGameActive);
+
+    Vue.watchEffect(() => {
+      if (isPlaying.value && !hasLost.value && !isFrozenOnLoss.value) {
+        const now = nowRef.value;
+        const lost = targets.value.some(x => x.when + MAX_DELAY - now < 0);
+        if (lost) {
+          handleLose('expired');
+        }
+      }
+    });
+
+    const startGame = () => {
+      // Guard against click/touch leaking within 200ms of transitioning screens
+      if (performance.now() - lastTransitionTime < 200) return;
+
+      newAllTimeHigh.value = false;
+      newMouseHigh.value = false;
+      newTouchHigh.value = false;
+      newKeyboardHigh.value = false;
+      newAimTapHigh.value = false;
+      detailedLostReason.value = "";
+      overloadedCardIndex.value = null;
+      hoveredCardIndex.value = null;
+
+      endRunTrack.value = null;
+      endRunTrackRecord.value = 0;
+      endRunTrackIsNewHigh.value = false;
+
+      runCorrectClicks.value = 0;
+      runTotalStrikes.value = 0;
+      runDurationSeconds.value = 0;
+
+      gameStartTime.value = performance.now();
+      targets.value = [];
+      hasLost.value = false;
+      isFrozenOnLoss.value = false;
+      isProceedReady.value = false;
+      totalScore.value = 0;
+      strikeSlots.value = [null, null, null];
+      isPureMouse.value = true;
+      isPureTouch.value = true;
+      isPureKeyboard.value = true;
+      isPureAimTap.value = true;
+      isPlaying.value = true;
+    };
+
+    // Numpad triggers mapped safely to Grid array indexes
+    const codes = pipe([7, 8, 9, 4, 5, 6, 1, 2, 3], pipe.map(x => `Numpad${x}`), collect);
+
+    for (const [keybind, i] of enumerate(codes)) {
+      useKeybind(keybind, () => {
+        clicked(i, "keyboard");
+      });
+    }
+
+    // Aim-Tap inputs: Z and X physical keybindings
+    useKeybind("KeyZ", () => {
+      if (hoveredCardIndex.value !== null) {
+        clicked(hoveredCardIndex.value, "aim-tap");
+      }
+    });
+
+    useKeybind("KeyX", () => {
+      if (hoveredCardIndex.value !== null) {
+        clicked(hoveredCardIndex.value, "aim-tap");
+      }
+    });
+
+    useKeybind("Space", () => {
+      if (isFrozenOnLoss.value) {
+        proceedToSummary();
+      } else if (hasLost.value || !isPlaying.value) {
+        startGame();
+      }
+    });
+
+    const handleLostClicked = () => {
+       startGame();
+    };
+
+    return {
+      cards,
+      targetsById,
+      totalScore,
+      clicked,
+      isPlaying,
+      isFrozenOnLoss,
+      isProceedReady,
+      hasLost,
+      startGame,
+      highScore,
+      codes,
+      misses,
+      mouseScore,
+      touchScore,
+      keyboardScore,
+      aimTapScore,
+      isPureMouse,
+      isPureTouch,
+      isPureKeyboard,
+      isPureAimTap,
+      activeTrack,
+      handleLostClicked,
+      shakingCards,
+      scoreFloaters,
+      detailedLostReason,
+      newAllTimeHigh,
+      newMouseHigh,
+      newTouchHigh,
+      newKeyboardHigh,
+      newAimTapHigh,
+      isStrikeActive,
+      getStrokeOffset,
+      overloadedCardIndex,
+      hoveredCardIndex,
+      proceedToSummary,
+      runCorrectClicks,
+      runTotalStrikes,
+      formattedTimeAlive,
+      freezeActionMessage,
+      // Record states for end of run track
+      endRunTrack,
+      endRunTrackRecord,
+      endRunTrackIsNewHigh,
+      endRunTrackColor
+    }
+  }
+});
+
+// Mount App
+window.root = app.mount("#app");
+</script>
+</body>
+</html>

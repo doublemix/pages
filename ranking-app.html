@@ -411,7 +411,10 @@
                         .split(/\r?\n/)
                         .map(line => line.trim())
                         .filter(line => line.length > 0)
-                        .map(line => createItem(line));
+                        .map(line => {
+                                const match = line.match(/^(.*?)\s*\{([^}]+)\}\s*$/);
+                                return match ? createItem(match[1].trim(), match[2].trim()) : createItem(line);
+                            });
                     
                     const inputElement = e.target;
                     const keyIndex = getFocusIndex(inputElement);
