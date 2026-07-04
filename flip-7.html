@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flip-7 Scorer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body>
+  <div id="root"></div>
+
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/@doublemx2/combine-objects@0.12.0/dist/umd/combine.js"></script>
+  <script src="https://app.unpkg.com/tailwind-merge@3.3.1/files/dist/es5/bundle-cjs.js"></script>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React
+
+    const { clsx } = (function () {
+      let module = {}
+      module.exports = {}
+      function r(e) { var o, t, f = ""; if ("string" == typeof e || "number" == typeof e) f += e; else if ("object" == typeof e) if (Array.isArray(e)) { var n = e.length; for (o = 0; o < n; o++)e[o] && (t = r(e[o])) && (f && (f += " "), f += t) } else for (t in e) e[t] && (f && (f += " "), f += t); return f } function e() { for (var e, o, t = 0, f = "", n = arguments.length; t < n; t++)(e = arguments[t]) && (o = r(e)) && (f && (f += " "), f += o); return f } module.exports = e, module.exports.clsx = e;
+      return module.exports
+    })()
+
+
+    function cn(...classes) {
+      return (clsx(...classes))
+    }
+
+    const t = {
+      arrays: {
+        push: item => it => [...it, item],
+        updateEach: update => it => it.map(item => combine(item, update)),
+      },
+      updates: {
+        if: (condition, update) => item => condition(item) ? combine(item, update) : combine.ignore()
+      }
+    }
+
+    function* range(start, end) {
+      for (let i = start; i < end; i++) {
+        yield i
+      }
+    }
+
+    function map(fn) {
+      return function* (iterable) {
+        for (const item of iterable) {
+          yield fn(item)
+        }
+      }
+    }
+
+    function pipe(iterable, ...fns) {
+      return fns.reduce((acc, fn) => fn(acc), iterable)
+    }
+
+    function useReducerState(initialState) {
+      const [state, setState] = useState(initialState)
+
+      const dispatch = (update) => {
+        setState(oldState => combine(oldState, update))
+      }
+
+      return [state, dispatch]
+    }
+
+    const DispatchContext = React.createContext(null);
+    const useDispatch = () => React.useContext(DispatchContext);
+
+    function generateId() {
+      return '_' + Math.random().toString(36).substr(2, 9);
+    }
+
+    const addNewPlayer = ({ name }) => ({
+      players: t.arrays.push({ id: generateId(), name, score: 0, selectedCards: [], isBusted: false }),
+      newPlayerName: '',
+    })
+
+    function Card({ className, children }) {
+      return <div className={`bg-white p-8 rounded-lg shadow-md ${className || ''}`}>{children}</div>
+    }
+
+    function Button({ children, className, ...otherButtonProps }) {
+      return (
+        <button
+          {...otherButtonProps}
+          className={`bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded disabled:bg-gray-400 disabled:cursor-not-allowed active:bg-blue-700 ${className || ''}`}
+        >
+          {children}
+        </button>
+      )
+    }
+
+    const cards = [
+      ...(pipe(range(0, 12 + 1), map(n => ({ type: 'number', number: n, id: `number-${n}` })))),
+      { type: 'multiplier', value: 2, id: 'multiplier-2' },
+      { type: 'bonus', value: 2, id: 'bonus-2' },
+      { type: 'bonus', value: 4, id: 'bonus-4' },
+      { type: 'bonus', value: 6, id: 'bonus-6' },
+      { type: 'bonus', value: 8, id: 'bonus-8' },
+      { type: 'bonus', value: 10, id: 'bonus-10' },
+    ]
+
+    function updatePlayer(playerId, update) {
+      return {
+        players: t.arrays.updateEach(t.updates.if(player => player.id === playerId, update))
+      }
+    }
+
+    function bustPlayer(playerId) {
+      return updatePlayer(playerId, {
+        isBusted: it => !it,
+      })
+    }
+
+    function playerToggleCard(playerId, cardId) {
+      return updatePlayer(playerId, {
+        selectedCards: cards => cards.includes(cardId) ? cards.filter(id => id !== cardId) : [...cards, cardId]
+      })
+    }
+
+    function setPlayerScore(playerId, nextScore) {
+      return updatePlayer(playerId, {
+        score: nextScore,
+      })
+    }
+
+    function GameCard({ id, playerId, type, number, value, children, isSelected }) {
+      const dispatch = useDispatch();
+      const classNames = cn(
+        'bg-white flex items-center justify-center rounded-lg shadow-md w-[50px] h-[60px] border border-gray-300',
+        type === 'number' && 'text-blue-500',
+        type === 'multiplier' && 'text-green-500 bg-yellow-200',
+        type === 'bonus' && 'text-red-500 bg-yellow-200',
+        !isSelected && 'brightness-[80%]'
+      )
+      return (
+        <div className={classNames} onClick={() => dispatch(playerToggleCard(playerId, id))}>
+          {type === 'number' && <span>{number}</span>}
+          {type === 'multiplier' && <span>×{value}</span>}
+          {type === 'bonus' && <span>+{value}</span>}
+          {children}
+        </div>
+      )
+    }
+
+    function CardArray({ playerId, selectedCards }) {
+
+      return <div className="flex flex-col gap-2">
+        <div className="flex flex-row flex-wrap gap-2">
+          {cards.filter(c => c.type === 'number').map((card, index) => (
+            <GameCard key={card.id} {...card} playerId={playerId} isSelected={selectedCards.includes(card.id)} />
+          ))}
+        </div>
+        <div className="flex flex-row flex-wrap gap-2">
+          {cards.filter(c => c.type === 'multiplier' || c.type === 'bonus').map((card, index) => (
+            <GameCard key={card.id} {...card} playerId={playerId} isSelected={selectedCards.includes(card.id)} />
+          ))}
+        </div>
+      </div>
+    }
+
+    function PlayerCard({ id, name, score, selectedCards, isBusted }) {
+      const dispatch = useDispatch();
+      const subTotal = calculateCardScore(selectedCards)
+      const [manualScore, setManualScore] = useState(String(score))
+      const [isEditingScore, setIsEditingScore] = useState(false)
+
+      useEffect(() => {
+        setManualScore(String(score))
+      }, [score])
+
+      const saveManualScore = () => {
+        const parsedScore = Number(manualScore)
+        if (!Number.isFinite(parsedScore)) {
+          setManualScore(String(score))
+          setIsEditingScore(false)
+          return
+        }
+
+        dispatch(setPlayerScore(id, parsedScore))
+        setIsEditingScore(false)
+      }
+
+      const cancelManualScore = () => {
+        setManualScore(String(score))
+        setIsEditingScore(false)
+      }
+
+      return <Card className={cn("flex flex-col gap-4", isBusted && "opacity-50")}>
+        <div className="flex flex-row gap-8 flex-wrap items-baseline">
+          <h2 className="text-lg font-bold">{name}</h2>
+          {!isEditingScore ? (
+            <button
+              type="button"
+              className="text-sm text-gray-500 hover:text-gray-700 underline decoration-dotted underline-offset-2"
+              onClick={() => setIsEditingScore(true)}
+            >
+              Score: {score}
+            </button>
+          ) : (
+            <label className="text-sm text-gray-500 flex items-center gap-2">
+              <span>Score:</span>
+              <input
+                type="number"
+                className="border border-gray-300 rounded py-1 px-2 w-24 text-gray-700"
+                value={manualScore}
+                autoFocus
+                onChange={e => setManualScore(e.target.value)}
+                onBlur={saveManualScore}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    saveManualScore()
+                  }
+                  if (e.key === 'Escape') {
+                    e.preventDefault()
+                    cancelManualScore()
+                  }
+                }}
+              />
+            </label>
+          )}
+          <p className="text-sm text-gray-500">Subtotal: {subTotal}</p>
+        </div>
+        <CardArray playerId={id} selectedCards={selectedCards} />
+        <Button onClick={() => dispatch(bustPlayer(id))}>
+          {isBusted ? 'Busted' : 'Bust'}
+        </Button>
+      </Card>
+    }
+
+    function calculateCardScore(selectedCardIds) {
+      const selectedCards = selectedCardIds.map(cardId => cards.find(c => c.id === cardId))
+      const numberCards = selectedCards.filter(card => card && card.type === 'number')
+      const multiplierCards = selectedCards.filter(card => card && card.type === 'multiplier')
+      const bonusCards = selectedCards.filter(card => card && card.type === 'bonus')
+      const numberCardSubtotal = numberCards.reduce((sum, card) => sum + card.number, 0)
+      const multiplierTotal = multiplierCards.reduce((product, card) => product * card.value, 1)
+      const bonusTotal = bonusCards.reduce((sum, card) => sum + card.value, 0)
+      const flip7Bonus = selectedCards.length >= 7 ? 15 : 0
+      return (numberCardSubtotal * multiplierTotal) + bonusTotal + flip7Bonus
+    }
+
+    function scoreRound() {
+      return {
+        players: t.arrays.updateEach(t.updates.if(player => player.selectedCards.length > 0, player => ({
+          score: t.updates.if(() => !player.isBusted, score => score + calculateCardScore(player.selectedCards)),
+          selectedCards: [],
+          isBusted: false,
+        }))),
+      }
+    }
+
+
+    function App() {
+      const [state, dispatch] = useReducerState({ newPlayerName: '', players: [] })
+
+      const { players, newPlayerName } = state
+
+      return (
+        <DispatchContext.Provider value={dispatch}>
+          <div className="flex flex-col gap-8 p-8 min-h-screen bg-gray-100">
+            {players.map((player, index) => (
+              <PlayerCard key={index} {...player} />
+            ))}
+            <div>
+              <Button
+                onClick={() => dispatch(scoreRound())}
+              >
+                Score Round
+              </Button>
+            </div>
+            <Card>
+
+              <form className="flex flex-row gap-4">
+                <input
+                  type="text"
+                  placeholder="Player Name"
+                  className="border border-gray-300 rounded py-2 px-4"
+                  value={state.newPlayerName || ''}
+                  onChange={e => dispatch({ newPlayerName: e.target.value })}
+                />
+                <Button
+                  disabled={!state.newPlayerName.trim()}
+                  onClick={() => dispatch(addNewPlayer({ name: newPlayerName.trim() }))}
+                >
+                  Add Player
+                </Button>
+              </form>
+            </Card>
+          </div>
+        </DispatchContext.Provider>
+      );
+    }
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+
+</html>
