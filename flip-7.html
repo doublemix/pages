@@ -20,6 +20,10 @@
   <script type="text/babel">
     const { useState, useEffect, useRef } = React
 
+    function iife(fn, ...args) {
+      return fn(...args);
+    }
+
     const { clsx } = (function () {
       let module = {}
       module.exports = {}
@@ -74,8 +78,8 @@
       return [state, setState];
     }
 
-    function useReducerState(initialState) {
-      const [state, setState] = useStorage(initialState, 'flip-7-state', sessionStorage)
+    function useReducerState(initialState, key) {
+      const [state, setState] = useStorage(initialState, key, sessionStorage)
 
       const dispatch = (update) => {
         setState(oldState => combine(oldState, update))
@@ -201,6 +205,159 @@
           d="M6 18L18 6M6 6l12 12"
         />
       </svg>
+    }
+
+    const initialDeck = iife(() => {
+      const deck = []
+      for (let i = 0; i <= 12; i++) {
+        let count = i === 0 ? 1 : i;
+        for (let j = 0; j < count; j++) {
+          deck.push({ id: `${i}-${j}`, type: 'number', number: i })
+        }
+      }
+      let actions = [{ type: 'freeze', children: 'FR', color: 'blue' }, { type: 'flip-3', children: '3', color: 'yellow' }, { type: 'second-chance', children: '<3', color: 'red' }]
+      for (let action of actions) {
+        for (let n = 0; n < 3; n++) {
+          deck.push({ id: `${action.type}-${n}`, ...action })
+        }
+      }
+      deck.push({ id: 'x2', type: 'bonus', value: 'x2' })
+      deck.push({ id: '+2', type: 'bonus', value: '+2' })
+      deck.push({ id: '+4', type: 'bonus', value: '+4' })
+      deck.push({ id: '+6', type: 'bonus', value: '+6' })
+      deck.push({ id: '+8', type: 'bonus', value: '+8' })
+      deck.push({ id: '+10', type: 'bonus', value: '+10' })
+
+      return deck;
+    })
+
+    function shuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+
+    function DeckEmpty(props) {
+      return (
+        <div className="rounded-md bg-gray-200 w-16 h-24" {...props}></div>
+      )
+    }
+
+    const iconClassByScale = {
+      'sm': 'w-4 h-4',
+      'md': 'w-6 h-6',
+    }
+
+    function FreezeIcon({ scale = 'md' }) {
+      return <svg className={iconClassByScale[scale]} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        {/* snowflake icon */}
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12.0000,12.0000 L18.0000,12.0000 M18.0000,12.0000 L20.0000,8.5359 M18.0000,12.0000 L22.0000,12.0000 M18.0000,12.0000 L20.0000,15.4641 M12.0000,12.0000 L15.0000,17.1962 M15.0000,17.1962 L19.0000,17.1962 M15.0000,17.1962 L17.0000,20.6603 M15.0000,17.1962 L13.0000,20.6603 M12.0000,12.0000 L9.0000,17.1962 M9.0000,17.1962 L11.0000,20.6603 M9.0000,17.1962 L7.0000,20.6603 M9.0000,17.1962 L5.0000,17.1962 M12.0000,12.0000 L6.0000,12.0000 M6.0000,12.0000 L4.0000,15.4641 M6.0000,12.0000 L2.0000,12.0000 M6.0000,12.0000 L4.0000,8.5359 M12.0000,12.0000 L9.0000,6.8038 M9.0000,6.8038 L5.0000,6.8038 M9.0000,6.8038 L7.0000,3.3397 M9.0000,6.8038 L11.0000,3.3397 M12.0000,12.0000 L15.0000,6.8038 M15.0000,6.8038 L13.0000,3.3397 M15.0000,6.8038 L17.0000,3.3397 M15.0000,6.8038 L19.0000,6.8038"></path>
+      </svg>
+    }
+
+    function LightningIcon({ scale = 'md' }) {
+      return <svg className={iconClassByScale[scale]} fill="currentColor" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+      </svg>
+    }
+
+    function HeartIcon({ scale = 'md' }) {
+      return <svg className={iconClassByScale[scale]} fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+      </svg>
+    }
+
+    function DeckCard({ card, className, faceDown = false }) {
+      return (
+        <div className={cn(`pointer-events-none rounded-md w-16 h-24 transition-all duration-300 ${className} `)}>
+          {faceDown && <div className="rounded-md bg-orange-900 text-white w-16 h-24 flex items-center justify-center text-lg">Flip-7</div>}
+          {!faceDown && card && <>
+            {card.type === 'number' && <div className="rounded-md bg-white text-black w-16 h-24 flex items-center justify-center border-4 border-black">
+              <span className="text-2xl">{card.number}</span>
+              <div className="absolute top-2 right-2 leading-none">{card.number}</div>
+            </div>}
+            {card.type === 'freeze' && <div className="rounded-md bg-blue-300 text-black w-16 h-24 flex items-center justify-center border-4 border-black">
+              <FreezeIcon />
+              <div className="absolute top-2 right-2 leading-none"><FreezeIcon scale="sm" /></div>
+            </div>}
+            {card.type === 'flip-3' && <div className="rounded-md bg-yellow-300 text-yellow-600 w-16 h-24 flex items-center justify-center border-4 border-black">
+              <LightningIcon />
+              <div className="absolute top-2 right-2 leading-none"><LightningIcon scale="sm" /></div>
+            </div>}
+            {card.type === 'second-chance' && <div className="rounded-md bg-pink-300 text-pink-600 w-16 h-24 flex items-center justify-center border-4 border-black">
+              <HeartIcon />
+              <div className="absolute top-2 right-2 leading-none"><HeartIcon scale="sm" /></div>
+            </div>}
+            {card.type === 'bonus' && <div className="rounded-md bg-orange-400 text-black w-16 h-24 flex items-center justify-center border-4 border-black">
+              <span className="text-2xl">{card.value}</span>
+              <div className="absolute top-2 right-2 leading-none">{card.value}</div>
+            </div>}
+          </>}
+        </div>
+      )
+    }
+
+    function DeckSimulator() {
+      const [state, dispatch] = useReducerState({ deck: initialDeck, drawn: [], shuffled: false })
+
+      const shuffleDeck = () => {
+        let shuffledDeck = shuffle(state.deck)
+        dispatch({ deck: shuffledDeck, shuffled: true })
+      }
+
+      useEffect(() => {
+        if (!state.shuffled) shuffleDeck()
+      }, [state])
+
+      const drawCard = () => {
+        dispatch(state => {
+          if (state.deck.length === 0) return combine.ignore()
+          const drawnCard = state.deck[0]
+          const remainingDeck = state.deck.slice(1)
+          return { deck: remainingDeck, drawn: [drawnCard, ...state.drawn] }
+        })
+      }
+
+      const resetDeck = () => {
+        dispatch({ deck: initialDeck, drawn: [], shuffled: false })
+      }
+
+      const topOfDeck = state.deck[0] ?? null
+      const [topOfDraw1 = null, topOfDraw2 = null, topOfDraw3 = null, topOfDraw4 = null] = state.drawn
+
+      const toRender = [
+        { card: topOfDeck, position: 'absolute z-4 top-0 left-0', faceDown: true, },
+        { card: topOfDraw1, position: 'absolute z-3 top-0 left-20' },
+        { card: topOfDraw2, position: 'absolute z-2 top-0 left-26' },
+        { card: topOfDraw3, position: 'absolute z-1 top-0 left-32' },
+        { card: topOfDraw4, position: 'absolute z-0 top-0 left-32' },
+      ]
+
+      const requestDraw = () => {
+        if (state.deck.length === 0) resetDeck()
+        else drawCard()
+      }
+
+      return (
+        <div className="flex flex-row flex-wrap gap-x-8 gap-y-4">
+          <div className="relative w-48">
+            <DeckEmpty onClick={requestDraw} />
+            {toRender.map(({ card, position, faceDown = false }) => (
+              card && <DeckCard key={card.id ?? 'empty'} card={card} className={position} faceDown={faceDown} />
+            ))}
+          </div>
+          <div>
+            <div>
+              <Button onClick={resetDeck}>Reset Deck</Button>
+            </div>
+            <div>
+              Cards: {state.deck.length}
+            </div>
+          </div>
+        </div>
+      )
     }
 
     function PlayerCard({ id, name, score, selectedCards, isBusted }) {
@@ -409,18 +566,43 @@
       )
     }
 
+    function Drawer({ open, onClose, children }) {
+      const [isMounted, setIsMounted] = useState(false)
+      useEffect(() => {
+        setIsMounted(true)
+      }, [])
+
+      return (
+        <div style={{ display: isMounted ? undefined : 'none' }} className={cn('z-100 fixed bottom-0 left-0 right-0 transition-all duration-300', open ? 'translate-y-0 shadow-[0_-8px_12px_-6px_rgba(0,0,0,0.3)]' : 'translate-y-full shadow-none')}>
+          <div className="bg-white p-4">
+            {children}
+          </div>
+          <div className="absolute top-2 right-2">
+            <button onClick={onClose} className="px-4 py-4"><X /></button>
+          </div>
+        </div>
+      )
+    }
+
 
     function App() {
-      const [state, dispatch] = useReducerState({ players: [], roundScores: [] })
+      const [state, dispatch] = useReducerState({ players: [], roundScores: [] }, 'flip-7-state')
 
       const [newPlayerName, setNewPlayerName] = useState('')
       const [scoreSheetDialogOpen, setScoreSheetDialogOpen] = useState(false)
 
       const { players } = state
 
+      const [isDeckSimulatorVisible, setIsDeckSimulatorVisible] = useState(false)
+
+      const toggleDisplayDeckSimulator = () => setIsDeckSimulatorVisible(it => !it)
+
       return (
         <DispatchContext.Provider value={dispatch}>
           <div className="py-4 flex flex-col gap-4 min-h-screen bg-gray-100 md:p-8 md:gap-8">
+            <Drawer open={isDeckSimulatorVisible} onClose={() => toggleDisplayDeckSimulator()}>
+              <DeckSimulator />
+            </Drawer>
             {players.map((player, index) => (
               <PlayerCard key={index} {...player} />
             ))}
@@ -443,6 +625,11 @@
               <Dialog title="Scores" open={scoreSheetDialogOpen} onClose={() => setScoreSheetDialogOpen(false)}>
                 <ScoreSheet state={state} />
               </Dialog>
+              <Button
+                onClick={() => toggleDisplayDeckSimulator()}
+              >
+                {isDeckSimulatorVisible ? 'Hide' : 'Show'} Deck
+              </Button>
             </div>
 
             <form className="px-4 flex flex-col gap-4 md:flex-row md:px-0" onSubmit={e => { e.preventDefault(); dispatch(addNewPlayer({ name: newPlayerName.trim() })); setNewPlayerName(''); }}>
