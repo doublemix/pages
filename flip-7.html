@@ -18,7 +18,7 @@
   <script src="https://app.unpkg.com/tailwind-merge@3.3.1/files/dist/es5/bundle-cjs.js"></script>
 
   <script type="text/babel">
-    const { useState, useEffect, useRef } = React
+    const { useState, useEffect, useRef, useCallback, useContext, createContext } = React
 
     function iife(fn, ...args) {
       return fn(...args);
@@ -53,6 +53,12 @@
       }
     }
 
+    function* reversed(array) {
+      for (let i = array.length - 1; i >= 0; i--) {
+        yield array[i]
+      }
+    }
+
     function map(fn) {
       return function* (iterable) {
         for (const item of iterable) {
@@ -61,8 +67,60 @@
       }
     }
 
-    function pipe(iterable, ...fns) {
-      return fns.reduce((acc, fn) => fn(acc), iterable)
+    function collect(iterable) {
+      return Array.from(iterable)
+    }
+
+    function pipe(initial, ...fns) {
+      return fns.reduce((acc, fn) => fn(acc), initial)
+    }
+
+    function useQueryParameter(queryParamName) {
+      const [value, setValue] = useState(() => {
+        const params = new URLSearchParams(window.location.search);
+        return params.get(queryParamName) || '';
+      });
+
+      const handleSetValue = useCallback((newValue) => {
+        setValue(newValue);
+        const params = new URLSearchParams(window.location.search);
+        if (newValue) {
+          params.set(queryParamName, newValue);
+        } else {
+          params.delete(queryParamName);
+        }
+        const newUrl = `${window.location.pathname}?${params.toString()}`;
+        window.history.replaceState({}, '', newUrl);
+      }, [queryParamName]);
+
+      return [value, handleSetValue];
+    }
+
+    const GameModeContext = createContext(null);
+    const useGameMode = () => {
+      const gameMode = useContext(GameModeContext);
+      if (!gameMode) {
+        throw new Error('useGameMode must be used within a GameModeProvider');
+      }
+      return gameMode;
+    }
+
+    function GameModeProvider({ children }) {
+      const [mode] = useQueryParameter('mode');
+
+      const isVengeance = mode === 'vengeance' || mode === 'brutal';
+      const isBrutal = mode === 'brutal';
+
+      return (
+        <GameModeContext.Provider value={{ isVengeance, isBrutal }}>
+          {children}
+        </GameModeContext.Provider>
+      );
+    }
+
+    const useIsVengeanceMode = () => {
+      const { isVengeance } = useGameMode();
+      return isVengeance;
     }
 
     function useStorage(initialState, key, storage = localStorage) {
@@ -115,15 +173,43 @@
       )
     }
 
-    const cards = [
-      ...(pipe(range(0, 12 + 1), map(n => ({ type: 'number', number: n, id: `number-${n}` })))),
-      { type: 'multiplier', value: 2, id: 'multiplier-2' },
-      { type: 'bonus', value: 2, id: 'bonus-2' },
-      { type: 'bonus', value: 4, id: 'bonus-4' },
-      { type: 'bonus', value: 6, id: 'bonus-6' },
-      { type: 'bonus', value: 8, id: 'bonus-8' },
-      { type: 'bonus', value: 10, id: 'bonus-10' },
+    const makeModifiers = ({ modes, modifierMultiplier, multiplierBaseName, modifierBaseName }) => {
+      const modifiers = []
+
+      modifiers.push({
+        type: 'multiplier',
+        value: modifierMultiplier * 2,
+        id: `${multiplierBaseName}-2`,
+        modes,
+      })
+
+      for (let i = 2; i <= 10; i += 2) {
+        modifiers.push({
+          type: 'bonus',
+          value: i * modifierMultiplier,
+          id: `${modifierBaseName}-${i}`,
+          modes,
+        })
+      }
+
+      return modifiers
+    }
+
+    const allCards = [
+      { type: 'number', number: 13, id: 'lucky-number-13', text: 'lucky', modes: ['vengeance'] },
+      ...(pipe(range(0, 13 + 1), collect, reversed, map(n => ({ type: 'number', number: n, id: `number-${n}`, modes: n === 13 ? ['vengeance'] : ['classic', 'vengeance'] })))),
+      ...makeModifiers({ modes: ['classic'], modifierMultiplier: 1, multiplierBaseName: 'multiply', modifierBaseName: 'bonus' }),
+      ...makeModifiers({ modes: ['vengeance'], modifierMultiplier: -1, multiplierBaseName: 'divide', modifierBaseName: 'penalty' }),
     ]
+
+    const classicCards = allCards.filter(card => card.modes.includes('classic'))
+    const vengeanceCards = allCards.filter(card => card.modes.includes('vengeance'))
+
+    function useCards() {
+      const isVengeanceMode = useIsVengeanceMode()
+      return isVengeanceMode ? vengeanceCards : classicCards
+    }
+
 
     function updatePlayer(playerId, update) {
       return {
@@ -155,10 +241,10 @@
       })
     }
 
-    function GameCard({ id, playerId, type, number, value, children, isSelected }) {
+    function GameCard({ id, playerId, type, number, value, text, isSelected }) {
       const dispatch = useDispatch();
       const classNames = cn(
-        'bg-white flex items-center justify-center rounded-lg shadow-md w-[60px] h-[40px] md:w-[60px] md:h-[80px] border border-gray-300 text-2xl font-bold',
+        'relative bg-white flex items-center justify-center rounded-lg shadow-md w-[60px] h-[40px] md:w-[60px] md:h-[80px] border border-gray-300 text-2xl/none font-bold',
         type === 'number' && 'text-blue-500',
         type === 'multiplier' && 'text-green-500 bg-yellow-200',
         type === 'bonus' && 'text-red-500 bg-yellow-200',
@@ -166,15 +252,18 @@
       )
       return (
         <div className={classNames} onClick={() => dispatch(playerToggleCard(playerId, id))}>
-          {type === 'number' && <span>{number}</span>}
-          {type === 'multiplier' && <span>×{value}</span>}
-          {type === 'bonus' && <span>+{value}</span>}
-          {children}
+          <span className="relative">
+            {text && <div className="absolute top-0 left-1/2 -translate-x-1/2 translate-y-[-60%] text-[8px]/none uppercase">{text}</div>}
+            {type === 'number' && number}
+            {type === 'multiplier' && <>{value > 0 ? '×' : value < 0 ? '÷' : null}{Math.abs(value)}</>}
+            {type === 'bonus' && <>{value > 0 ? '+' : value < 0 ? '-' : null}{Math.abs(value)}</>}
+          </span>
         </div>
       )
     }
 
     function CardArray({ playerId, selectedCards }) {
+      const cards = useCards();
 
       return <div className="flex flex-row flex-wrap md:flex-col gap-2 md:gap-4">
         <div className="contents md:flex flex-row flex-wrap gap-2 md:gap-4">
@@ -362,7 +451,8 @@
 
     function PlayerCard({ id, name, score, selectedCards, isBusted }) {
       const dispatch = useDispatch();
-      const subTotal = calculateCardScore(selectedCards)
+      const { isBrutal } = useGameMode()
+      const subTotal = calculateCardScore(selectedCards, { isBrutal })
       const [manualScore, setManualScore] = useState(String(score))
       const [isEditingScore, setIsEditingScore] = useState(false)
 
@@ -423,6 +513,7 @@
               </label>
             )}
             <p className="text-sm text-gray-500">Subtotal: {subTotal.score}</p>
+            {subTotal.isFlip7 && <span className="bg-blue-700 text-white text-sm/tight px-2 rounded-lg">Flip 7!</span>}
             <div className="ms-auto self-center">
               <button onClick={() => dispatch(removePlayer(id))}>
                 <X />
@@ -437,17 +528,19 @@
       )
     }
 
-    function calculateCardScore(selectedCardIds) {
-      const selectedCards = selectedCardIds.map(cardId => cards.find(c => c.id === cardId))
+    function calculateCardScore(selectedCardIds, { isBrutal }) {
+      const selectedCards = selectedCardIds.map(cardId => allCards.find(c => c.id === cardId))
       const numberCards = selectedCards.filter(card => card && card.type === 'number')
       const multiplierCards = selectedCards.filter(card => card && card.type === 'multiplier')
       const bonusCards = selectedCards.filter(card => card && card.type === 'bonus')
       const numberCardSubtotal = numberCards.reduce((sum, card) => sum + card.number, 0)
-      const multiplierTotal = multiplierCards.reduce((product, card) => product * card.value, 1)
+      const multiplierTotal = multiplierCards.reduce((product, card) => product * Math.pow(Math.abs(card.value), Math.sign(card.value)), 1)
       const bonusTotal = bonusCards.reduce((sum, card) => sum + card.value, 0)
       const isFlip7 = selectedCards.length >= 7
       const flip7Bonus = isFlip7 ? 15 : 0
-      return { score: (numberCardSubtotal * multiplierTotal) + bonusTotal + flip7Bonus, isFlip7 }
+      const subtotal = Math.floor(numberCardSubtotal * multiplierTotal) + bonusTotal + flip7Bonus
+      const score = isBrutal ? subtotal : Math.max(0, subtotal)
+      return { score, isFlip7 }
     }
 
     function scoreRound() {
@@ -598,56 +691,58 @@
       const toggleDisplayDeckSimulator = () => setIsDeckSimulatorVisible(it => !it)
 
       return (
-        <DispatchContext.Provider value={dispatch}>
-          <div className="py-4 flex flex-col gap-4 min-h-screen bg-gray-100 md:p-8 md:gap-8">
-            <Drawer open={isDeckSimulatorVisible} onClose={() => toggleDisplayDeckSimulator()}>
-              <DeckSimulator />
-            </Drawer>
-            {players.map((player, index) => (
-              <PlayerCard key={index} {...player} />
-            ))}
-            <div className="px-4 md:px-0 flex flex-row flex-wrap gap-4">
-              <Button
-                onClick={() => dispatch(scoreRound())}
-              >
-                Score Round
-              </Button>
-              <Button
-                onClick={() => dispatch(reset())}
-              >
-                Reset Game
-              </Button>
-              <Button
-                onClick={() => setScoreSheetDialogOpen(true)}
-              >
-                View Scoresheet
-              </Button>
-              <Dialog title="Scores" open={scoreSheetDialogOpen} onClose={() => setScoreSheetDialogOpen(false)}>
-                <ScoreSheet state={state} />
-              </Dialog>
-              <Button
-                onClick={() => toggleDisplayDeckSimulator()}
-              >
-                {isDeckSimulatorVisible ? 'Hide' : 'Show'} Deck
-              </Button>
-            </div>
+        <GameModeProvider>
+          <DispatchContext.Provider value={dispatch}>
+            <div className="py-4 flex flex-col gap-4 min-h-screen bg-gray-100 md:p-8 md:gap-8">
+              <Drawer open={isDeckSimulatorVisible} onClose={() => toggleDisplayDeckSimulator()}>
+                <DeckSimulator />
+              </Drawer>
+              {players.map((player, index) => (
+                <PlayerCard key={index} {...player} />
+              ))}
+              <div className="px-4 md:px-0 flex flex-row flex-wrap gap-4">
+                <Button
+                  onClick={() => dispatch(scoreRound())}
+                >
+                  Score Round
+                </Button>
+                <Button
+                  onClick={() => dispatch(reset())}
+                >
+                  Reset Game
+                </Button>
+                <Button
+                  onClick={() => setScoreSheetDialogOpen(true)}
+                >
+                  View Scoresheet
+                </Button>
+                <Dialog title="Scores" open={scoreSheetDialogOpen} onClose={() => setScoreSheetDialogOpen(false)}>
+                  <ScoreSheet state={state} />
+                </Dialog>
+                <Button
+                  onClick={() => toggleDisplayDeckSimulator()}
+                >
+                  {isDeckSimulatorVisible ? 'Hide' : 'Show'} Deck
+                </Button>
+              </div>
 
-            <form className="px-4 flex flex-col gap-4 md:flex-row md:px-0" onSubmit={e => { e.preventDefault(); dispatch(addNewPlayer({ name: newPlayerName.trim() })); setNewPlayerName(''); }}>
-              <input
-                type="text"
-                placeholder="Player Name"
-                className="border border-gray-300 rounded py-2 px-4 bg-white"
-                value={newPlayerName}
-                onChange={e => setNewPlayerName(e.target.value)}
-              />
-              <Button
-                disabled={!newPlayerName.trim()}
-              >
-                Add Player
-              </Button>
-            </form>
-          </div>
-        </DispatchContext.Provider>
+              <form className="px-4 flex flex-col gap-4 md:flex-row md:px-0" onSubmit={e => { e.preventDefault(); dispatch(addNewPlayer({ name: newPlayerName.trim() })); setNewPlayerName(''); }}>
+                <input
+                  type="text"
+                  placeholder="Player Name"
+                  className="border border-gray-300 rounded py-2 px-4 bg-white"
+                  value={newPlayerName}
+                  onChange={e => setNewPlayerName(e.target.value)}
+                />
+                <Button
+                  disabled={!newPlayerName.trim()}
+                >
+                  Add Player
+                </Button>
+              </form>
+            </div>
+          </DispatchContext.Provider>
+        </GameModeProvider>
       );
     }
 
