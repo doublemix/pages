@@ -96,6 +96,13 @@
       return [value, handleSetValue];
     }
 
+    function getGameModeFlags(mode) {
+      return {
+        isVengeance: mode === 'vengeance' || mode === 'brutal',
+        isBrutal: mode === 'brutal',
+      }
+    }
+
     const GameModeContext = createContext(null);
     const useGameMode = () => {
       const gameMode = useContext(GameModeContext);
@@ -107,9 +114,7 @@
 
     function GameModeProvider({ children }) {
       const [mode] = useQueryParameter('mode');
-
-      const isVengeance = mode === 'vengeance' || mode === 'brutal';
-      const isBrutal = mode === 'brutal';
+      const { isVengeance, isBrutal } = getGameModeFlags(mode)
 
       return (
         <GameModeContext.Provider value={{ isVengeance, isBrutal }}>
@@ -528,7 +533,7 @@
       )
     }
 
-    function calculateCardScore(selectedCardIds, { isBrutal }) {
+    function calculateCardScore(selectedCardIds, { isBrutal = false } = {}) {
       const selectedCards = selectedCardIds.map(cardId => allCards.find(c => c.id === cardId))
       const numberCards = selectedCards.filter(card => card && card.type === 'number')
       const multiplierCards = selectedCards.filter(card => card && card.type === 'multiplier')
@@ -545,8 +550,9 @@
 
     function scoreRound() {
       return state => {
+        const { isBrutal } = getGameModeFlags(new URLSearchParams(window.location.search).get('mode'))
         const scoresByPlayer = Object.fromEntries(state.players.map(player => {
-          const { score, isFlip7 } = calculateCardScore(player.selectedCards)
+          const { score, isFlip7 } = calculateCardScore(player.selectedCards, { isBrutal })
           return [player.id, { score, isFlip7, busted: player.isBusted }]
         }))
 
