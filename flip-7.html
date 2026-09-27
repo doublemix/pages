@@ -96,6 +96,13 @@
       return [value, handleSetValue];
     }
 
+    function getGameModeFlags(mode) {
+      return {
+        isVengeance: mode === 'vengeance' || mode === 'brutal',
+        isBrutal: mode === 'brutal',
+      }
+    }
+
     const GameModeContext = createContext(null);
     const useGameMode = () => {
       const gameMode = useContext(GameModeContext);
@@ -107,9 +114,7 @@
 
     function GameModeProvider({ children }) {
       const [mode] = useQueryParameter('mode');
-
-      const isVengeance = mode === 'vengeance' || mode === 'brutal';
-      const isBrutal = mode === 'brutal';
+      const { isVengeance, isBrutal } = getGameModeFlags(mode)
 
       return (
         <GameModeContext.Provider value={{ isVengeance, isBrutal }}>
@@ -528,7 +533,7 @@
       )
     }
 
-    function calculateCardScore(selectedCardIds, { isBrutal }) {
+    function calculateCardScore(selectedCardIds, { isBrutal = false } = {}) {
       const selectedCards = selectedCardIds.map(cardId => allCards.find(c => c.id === cardId))
       const numberCards = selectedCards.filter(card => card && card.type === 'number')
       const multiplierCards = selectedCards.filter(card => card && card.type === 'multiplier')
@@ -543,10 +548,10 @@
       return { score, isFlip7 }
     }
 
-    function scoreRound() {
+    function scoreRound({ isBrutal = false } = {}) {
       return state => {
         const scoresByPlayer = Object.fromEntries(state.players.map(player => {
-          const { score, isFlip7 } = calculateCardScore(player.selectedCards)
+          const { score, isFlip7 } = calculateCardScore(player.selectedCards, { isBrutal })
           return [player.id, { score, isFlip7, busted: player.isBusted }]
         }))
 
@@ -678,8 +683,9 @@
     }
 
 
-    function App() {
+    function Flip7App() {
       const [state, dispatch] = useReducerState({ players: [], roundScores: [] }, 'flip-7-state')
+      const { isBrutal } = useGameMode()
 
       const [newPlayerName, setNewPlayerName] = useState('')
       const [scoreSheetDialogOpen, setScoreSheetDialogOpen] = useState(false)
@@ -691,59 +697,65 @@
       const toggleDisplayDeckSimulator = () => setIsDeckSimulatorVisible(it => !it)
 
       return (
-        <GameModeProvider>
-          <DispatchContext.Provider value={dispatch}>
-            <div className="py-4 flex flex-col gap-4 min-h-screen bg-gray-100 md:p-8 md:gap-8">
-              <Drawer open={isDeckSimulatorVisible} onClose={() => toggleDisplayDeckSimulator()}>
-                <DeckSimulator />
-              </Drawer>
-              {players.map((player, index) => (
-                <PlayerCard key={index} {...player} />
-              ))}
-              <div className="px-4 md:px-0 flex flex-row flex-wrap gap-4">
-                <Button
-                  onClick={() => dispatch(scoreRound())}
-                >
-                  Score Round
-                </Button>
-                <Button
-                  onClick={() => dispatch(reset())}
-                >
-                  Reset Game
-                </Button>
-                <Button
-                  onClick={() => setScoreSheetDialogOpen(true)}
-                >
-                  View Scoresheet
-                </Button>
-                <Dialog title="Scores" open={scoreSheetDialogOpen} onClose={() => setScoreSheetDialogOpen(false)}>
-                  <ScoreSheet state={state} />
-                </Dialog>
-                <Button
-                  onClick={() => toggleDisplayDeckSimulator()}
-                >
-                  {isDeckSimulatorVisible ? 'Hide' : 'Show'} Deck
-                </Button>
-              </div>
-
-              <form className="px-4 flex flex-col gap-4 md:flex-row md:px-0" onSubmit={e => { e.preventDefault(); dispatch(addNewPlayer({ name: newPlayerName.trim() })); setNewPlayerName(''); }}>
-                <input
-                  type="text"
-                  placeholder="Player Name"
-                  className="border border-gray-300 rounded py-2 px-4 bg-white"
-                  value={newPlayerName}
-                  onChange={e => setNewPlayerName(e.target.value)}
-                />
-                <Button
-                  disabled={!newPlayerName.trim()}
-                >
-                  Add Player
-                </Button>
-              </form>
+        <DispatchContext.Provider value={dispatch}>
+          <div className="py-4 flex flex-col gap-4 min-h-screen bg-gray-100 md:p-8 md:gap-8">
+            <Drawer open={isDeckSimulatorVisible} onClose={() => toggleDisplayDeckSimulator()}>
+              <DeckSimulator />
+            </Drawer>
+            {players.map((player, index) => (
+              <PlayerCard key={index} {...player} />
+            ))}
+            <div className="px-4 md:px-0 flex flex-row flex-wrap gap-4">
+              <Button
+                onClick={() => dispatch(scoreRound({ isBrutal }))}
+              >
+                Score Round
+              </Button>
+              <Button
+                onClick={() => dispatch(reset())}
+              >
+                Reset Game
+              </Button>
+              <Button
+                onClick={() => setScoreSheetDialogOpen(true)}
+              >
+                View Scoresheet
+              </Button>
+              <Dialog title="Scores" open={scoreSheetDialogOpen} onClose={() => setScoreSheetDialogOpen(false)}>
+                <ScoreSheet state={state} />
+              </Dialog>
+              <Button
+                onClick={() => toggleDisplayDeckSimulator()}
+              >
+                {isDeckSimulatorVisible ? 'Hide' : 'Show'} Deck
+              </Button>
             </div>
-          </DispatchContext.Provider>
-        </GameModeProvider>
+
+            <form className="px-4 flex flex-col gap-4 md:flex-row md:px-0" onSubmit={e => { e.preventDefault(); dispatch(addNewPlayer({ name: newPlayerName.trim() })); setNewPlayerName(''); }}>
+              <input
+                type="text"
+                placeholder="Player Name"
+                className="border border-gray-300 rounded py-2 px-4 bg-white"
+                value={newPlayerName}
+                onChange={e => setNewPlayerName(e.target.value)}
+              />
+              <Button
+                disabled={!newPlayerName.trim()}
+              >
+                Add Player
+              </Button>
+            </form>
+          </div>
+        </DispatchContext.Provider>
       );
+    }
+
+    function App() {
+      return (
+        <GameModeProvider>
+          <Flip7App />
+        </GameModeProvider>
+      )
     }
 
     const app = ReactDOM.createRoot(root)
