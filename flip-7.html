@@ -541,7 +541,12 @@
       const numberCardSubtotal = numberCards.reduce((sum, card) => sum + card.number, 0)
       const multiplierTotal = multiplierCards.reduce((product, card) => product * Math.pow(Math.abs(card.value), Math.sign(card.value)), 1)
       const bonusTotal = bonusCards.reduce((sum, card) => sum + card.value, 0)
-      const isFlip7 = selectedCards.length >= 7
+      const distinctFlip7Numbers = new Set(
+        numberCards
+          .map(card => card.number)
+          .filter(number => number >= 0 && number <= 12)
+      )
+      const isFlip7 = distinctFlip7Numbers.size >= 7
       const flip7Bonus = isFlip7 ? 15 : 0
       const subtotal = Math.floor(numberCardSubtotal * multiplierTotal) + bonusTotal + flip7Bonus
       const score = isBrutal ? subtotal : Math.max(0, subtotal)
