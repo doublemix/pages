@@ -700,13 +700,10 @@
     }
 
     function Drawer({ open, onClose, children }) {
-      const [isMounted, setIsMounted] = useState(false)
-      useEffect(() => {
-        setIsMounted(true)
-      }, [])
-
+      const hasOpenedRef = useRef(open)
+      if (open) hasOpenedRef.current = true
       return (
-        <div style={{ display: isMounted ? undefined : 'none' }} className={cn('z-100 fixed bottom-0 left-0 right-0 transition-all duration-300', open ? 'translate-y-0 shadow-[0_-8px_12px_-6px_rgba(0,0,0,0.3)]' : 'translate-y-full shadow-none')}>
+        <div className={cn('z-100 fixed bottom-0 left-0 right-0', hasOpenedRef.current && 'transition-all duration-300', open ? 'translate-y-0 shadow-[0_-8px_12px_-6px_rgba(0,0,0,0.3)]' : 'translate-y-full shadow-none')}>
           <div className="bg-white p-4">
             {children}
           </div>
