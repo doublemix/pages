@@ -234,6 +234,12 @@
       })
     }
 
+    function stayPlayer(playerId) {
+      return updatePlayer(playerId, {
+        roundStatus: it => it === 'stayed' ? 'normal' : 'stayed'
+      })
+    }
+
     function playerToggleCard(playerId, cardId) {
       return updatePlayer(playerId, {
         selectedCards: cards => cards.includes(cardId) ? cards.filter(id => id !== cardId) : [...cards, cardId]
@@ -468,6 +474,7 @@
       const [isEditingScore, setIsEditingScore] = useState(false)
       const isBusted = roundStatus === 'busted'
       const isFrozen = roundStatus === 'frozen'
+      const isStayed = roundStatus === 'stayed'
 
       useEffect(() => {
         setManualScore(String(score))
@@ -491,7 +498,7 @@
       }
 
       return (
-        <div className={cn("relative bg-white md:rounded-lg shadow-md overflow-hidden", isBusted && "opacity-50", isFrozen && "opacity-50")}>
+        <div className={cn("relative bg-white md:rounded-lg shadow-md overflow-hidden", isBusted && "opacity-50", isFrozen && "opacity-50", isStayed && "opacity-50")}>
           <div className="p-4 md:p-8 flex flex-col gap-2 md:gap-4">
             {isFrozen && <div className="absolute inset-0 bg-blue-400/20 pointer-events-none"></div>}
             {isBusted && <div className="absolute inset-0 bg-gray-400/20 pointer-events-none"></div>}
@@ -546,6 +553,11 @@
               <div className="flex-1 md:flex-initial">
                 <Button className="w-full" onClick={() => dispatch(freezePlayer(id))}>
                   {isFrozen ? 'Frozen' : 'Freeze'}
+                </Button>
+              </div>
+              <div className="flex-1 md:flex-initial">
+                <Button className="w-full" onClick={() => dispatch(stayPlayer(id))}>
+                  {isStayed ? 'Stayed' : 'Stay'}
                 </Button>
               </div>
             </div>
