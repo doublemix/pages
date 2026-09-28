@@ -159,7 +159,7 @@
     }
 
     const addNewPlayer = ({ name }) => ({
-      players: t.arrays.push({ id: generateId(), name, score: 0, selectedCards: [], isBusted: false }),
+      players: t.arrays.push({ id: generateId(), name, score: 0, selectedCards: [], roundStatus: 'normal' }),
       newPlayerName: '',
     })
 
@@ -224,7 +224,13 @@
 
     function bustPlayer(playerId) {
       return updatePlayer(playerId, {
-        isBusted: it => !it,
+        roundStatus: it => it === 'busted' ? 'normal' : 'busted'
+      })
+    }
+
+    function freezePlayer(playerId) {
+      return updatePlayer(playerId, {
+        roundStatus: it => it === 'frozen' ? 'normal' : 'frozen'
       })
     }
 
@@ -454,12 +460,14 @@
       )
     }
 
-    function PlayerCard({ id, name, score, selectedCards, isBusted }) {
+    function PlayerCard({ id, name, score, selectedCards, roundStatus }) {
       const dispatch = useDispatch();
       const { isBrutal } = useGameMode()
       const subTotal = calculateCardScore(selectedCards, { isBrutal })
       const [manualScore, setManualScore] = useState(String(score))
       const [isEditingScore, setIsEditingScore] = useState(false)
+      const isBusted = roundStatus === 'busted'
+      const isFrozen = roundStatus === 'frozen'
 
       useEffect(() => {
         setManualScore(String(score))
@@ -483,52 +491,65 @@
       }
 
       return (
-        <div className={cn("bg-white p-4 md:p-8 md:rounded-lg shadow-md flex flex-col gap-2 md:gap-4", isBusted && "opacity-50")}>
-          <div className="flex flex-row gap-x-8 gap-y-2 flex-wrap items-baseline">
-            <h2 className="text-lg md:text-2xl font-bold">{name}</h2>
-            {!isEditingScore ? (
-              <button
-                type="button"
-                className="text-sm text-gray-500 hover:text-gray-700 underline decoration-dotted underline-offset-2"
-                onClick={() => setIsEditingScore(true)}
-              >
-                Score: {score}
-              </button>
-            ) : (
-              <label className="text-sm text-gray-500 flex items-center gap-2">
-                <span>Score:</span>
-                <input
-                  type="number"
-                  className="border border-gray-300 rounded py-1 px-2 w-24 text-gray-700"
-                  value={manualScore}
-                  autoFocus
-                  onChange={e => setManualScore(e.target.value)}
-                  onBlur={saveManualScore}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      saveManualScore()
-                    }
-                    if (e.key === 'Escape') {
-                      e.preventDefault()
-                      cancelManualScore()
-                    }
-                  }}
-                />
-              </label>
-            )}
-            <p className="text-sm text-gray-500">Subtotal: {subTotal.score}</p>
-            {subTotal.isFlip7 && <span className="bg-blue-700 text-white text-sm/tight px-2 rounded-lg">Flip 7!</span>}
-            <div className="ms-auto self-center">
-              <button onClick={() => dispatch(removePlayer(id))}>
-                <X />
-              </button>
+        <div className={cn("relative bg-white md:rounded-lg shadow-md overflow-hidden", isBusted && "opacity-50", isFrozen && "opacity-50")}>
+          <div className="p-4 md:p-8 flex flex-col gap-2 md:gap-4">
+            {isFrozen && <div className="absolute inset-0 bg-blue-400/20 pointer-events-none"></div>}
+            {isBusted && <div className="absolute inset-0 bg-gray-400/20 pointer-events-none"></div>}
+            <div className="flex flex-row gap-x-8 gap-y-2 flex-wrap items-baseline">
+              <h2 className="text-lg md:text-2xl font-bold">{name}</h2>
+              {!isEditingScore ? (
+                <button
+                  type="button"
+                  className="text-sm text-gray-500 hover:text-gray-700 underline decoration-dotted underline-offset-2"
+                  onClick={() => setIsEditingScore(true)}
+                >
+                  Score: {score}
+                </button>
+              ) : (
+                <label className="text-sm text-gray-500 flex items-center gap-2">
+                  <span>Score:</span>
+                  <input
+                    type="number"
+                    className="border border-gray-300 rounded py-1 px-2 w-24 text-gray-700"
+                    value={manualScore}
+                    autoFocus
+                    onChange={e => setManualScore(e.target.value)}
+                    onBlur={saveManualScore}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        saveManualScore()
+                      }
+                      if (e.key === 'Escape') {
+                        e.preventDefault()
+                        cancelManualScore()
+                      }
+                    }}
+                  />
+                </label>
+              )}
+              <p className="text-sm text-gray-500">Subtotal: {subTotal.score}</p>
+              {subTotal.isFlip7 && <span className="bg-blue-700 text-white text-sm/tight px-2 rounded-lg">Flip 7!</span>}
+              <div className="ms-auto self-center">
+                <button onClick={() => dispatch(removePlayer(id))}>
+                  <X />
+                </button>
+              </div>
+            </div>
+            <CardArray playerId={id} selectedCards={selectedCards} />
+            <div className="flex flex-row flex-wrap gap-2">
+              <div className="flex-1 md:flex-initial">
+                <Button className="w-full" onClick={() => dispatch(bustPlayer(id))}>
+                  {isBusted ? 'Busted' : 'Bust'}
+                </Button>
+              </div>
+              <div className="flex-1 md:flex-initial">
+                <Button className="w-full" onClick={() => dispatch(freezePlayer(id))}>
+                  {isFrozen ? 'Frozen' : 'Freeze'}
+                </Button>
+              </div>
             </div>
           </div>
-          <CardArray playerId={id} selectedCards={selectedCards} />
-          <Button onClick={() => dispatch(bustPlayer(id))}>
-            {isBusted ? 'Busted' : 'Bust'}
-          </Button>
         </div>
       )
     }
@@ -552,16 +573,16 @@
       return state => {
         const scoresByPlayer = Object.fromEntries(state.players.map(player => {
           const { score, isFlip7 } = calculateCardScore(player.selectedCards, { isBrutal })
-          return [player.id, { score, isFlip7, busted: player.isBusted }]
+          return [player.id, { score, isFlip7, busted: player.roundStatus === 'busted', frozen: player.roundStatus === 'frozen' }]
         }))
 
         return {
           roundScores: t.arrays.push(scoresByPlayer),
           players: t.arrays.updateEach(
             player => ({
-              score: t.updates.if(!player.isBusted, score => score + scoresByPlayer[player.id].score),
+              score: t.updates.if(player.roundStatus !== 'busted', score => score + scoresByPlayer[player.id].score),
               selectedCards: [],
-              isBusted: false,
+              roundStatus: 'normal',
             }),
           ),
         }
@@ -573,7 +594,7 @@
         players: t.arrays.updateEach(() => ({
           score: 0,
           selectedCards: [],
-          isBusted: false,
+          roundStatus: 'normal',
         })),
         roundScores: [],
       }
@@ -624,7 +645,7 @@
 
       return (
         <table className="min-w-full border-collapse border border-gray-200 [&_th]:border-x [&_th]:border-gray-200 [&_td]:border-x [&_td]:border-gray-200 table-fixed">
-          <thead className="bg-gray-200 font-bold text-left">
+          <thead className="bg-gray-200 font-bold text-left table-fixed">
             <tr>
               <th className="p-2">Round</th>
               {players.map(player => (
@@ -639,12 +660,13 @@
                 {players.map(player => {
                   const playerRound = round[player.id]
                   if (!playerRound) return null
-                  const { score, busted, isFlip7 } = playerRound
+                  const { score, busted, isFlip7, frozen } = playerRound
                   return (
                     <td key={player.id} className='p-2'>
                       <div className="flex flex-row gap-2 items-center">
                         <span className={busted ? 'line-through text-gray-400' : ''}>{score}</span>
-                        {isFlip7 && <span className="bg-blue-700 text-white text-sm/tight px-2 rounded-lg">Flip 7!</span>}
+                        {isFlip7 && <span className="bg-blue-700 text-white text-sm/tight px-2 rounded-lg">7</span>}
+                        {frozen && <span className="text-blue-300"><FreezeIcon scale="sm" /></span>}
                       </div>
                     </td>
                   )
